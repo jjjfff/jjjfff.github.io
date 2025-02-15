@@ -22,18 +22,6 @@
             width: 100vw !important;
             height: 100vh !important;
         }
-        #info {
-            position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -50%);
-            width: 100%;
-            text-align: center;
-            color: #0ff;
-            font-size: 18px;
-            text-shadow: 0 0 10px #0ff;
-            z-index: 100;
-        }
         .controls {
             position: absolute;
             left: 50%;
@@ -54,11 +42,12 @@
             color: #0ff;
             padding: 15px 30px;
             margin: 0 20px;
-            font-size: 18px;
+            font-size: 24px;
             cursor: pointer;
             border-radius: 5px;
             box-shadow: 0 0 15px #0ff;
             transition: all 0.3s ease;
+            min-width: 80px;
         }
         .button:hover {
             background-color: rgba(0,255,255,0.2);
@@ -73,7 +62,19 @@
             font-size: 48px;
             text-shadow: 0 0 20px #f00;
             display: none;
-            z-index: 100;
+            z-index: 1000;
+            text-align: center;
+            width: 100%;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            background-color: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(5px);
+        }
+        #winnerText {
+            display: block;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
         .restart {
             background-color: rgba(0,0,0,0.5);
@@ -81,11 +82,15 @@
             color: #f00;
             padding: 15px 30px;
             margin-top: 20px;
-            font-size: 18px;
+            font-size: 24px;
             cursor: pointer;
             border-radius: 5px;
             box-shadow: 0 0 15px #f00;
             transition: all 0.3s ease;
+            font-family: 'Courier New', monospace;
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
         .restart:hover {
             background-color: rgba(255,0,0,0.2);
@@ -123,27 +128,67 @@
             z-index: 100;
             text-shadow: 0 0 5px #0f0;
         }
+        .ai-toggle {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            background-color: rgba(0,0,0,0.5);
+            border: 2px solid #f00;
+            color: #f00;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 5px;
+            box-shadow: 0 0 15px #f00;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+        
+        .ai-toggle:hover {
+            background-color: rgba(255,0,0,0.2);
+            box-shadow: 0 0 25px #f00;
+        }
+        
+        .ai-toggle.active {
+            border-color: #0f0;
+            color: #0f0;
+            box-shadow: 0 0 15px #0f0;
+        }
+        
+        .ai-toggle.active:hover {
+            background-color: rgba(0,255,0,0.2);
+            box-shadow: 0 0 25px #0f0;
+        }
+        
+        /* Add responsive styles for mobile */
+        @media (max-width: 768px) {
+            .game-over {
+                font-size: 32px;
+                padding: 10px;
+            }
+            .restart {
+                font-size: 20px;
+                padding: 12px 24px;
+            }
+        }
     </style>
 </head>
 <body>
-    <div id="info">TRON LIGHT CYCLE - 2 PLAYERS<br>
-        Player 1: A/D to turn | Player 2: Left/Right Arrow
-    </div>
-    
     <div class="game-over" id="gameOver">
         <span id="winnerText"></span>
         <button class="restart" onclick="restartGame()">RESTART</button>
     </div>
     
     <div class="controls" id="player1Controls">
-        <button class="button blue" id="leftBtnP1">A</button>
-        <button class="button blue" id="rightBtnP1">D</button>
+        <button class="button blue" id="leftBtnP1">←</button>
+        <button class="button blue" id="rightBtnP1">→</button>
     </div>
     <div class="controls" id="player2Controls">
         <button class="button red" id="leftBtnP2">←</button>
         <button class="button red" id="rightBtnP2">→</button>
     </div>
     <div id="fps" class="fps-counter">FPS: 60</div>
+    <button id="aiToggle" class="ai-toggle">AI: OFF</button>
 
     <script>
         // Set up Three.js scene
@@ -172,8 +217,60 @@
         // Grid setup
         const gridSize = 150;
         const gridDivisions = 100;
+        const boundary = gridSize / 2 - 1;
         const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x0088ff, 0x0033aa);
         scene.add(gridHelper);
+        
+        // Add arena walls
+        function createArenaWalls() {
+            const wallHeight = 10;
+            const wallThickness = 1;
+            
+            // Create side walls (longer to account for corners)
+            const sideWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, gridSize);
+            const frontBackWallGeometry = new THREE.BoxGeometry(gridSize + wallThickness * 2, wallHeight, wallThickness);
+            
+            const wallMaterial = new THREE.MeshBasicMaterial({
+                color: 0x0088ff,
+                transparent: true,
+                opacity: 0.3
+            });
+            
+            // Create walls with adjusted positions
+            const walls = [
+                // Side walls
+                { geometry: sideWallGeometry, pos: [-boundary - wallThickness/2, wallHeight/2, 0], rot: [0, 0, 0] },     // Left wall
+                { geometry: sideWallGeometry, pos: [boundary + wallThickness/2, wallHeight/2, 0], rot: [0, 0, 0] },      // Right wall
+                // Front/back walls (wider to connect with side walls)
+                { geometry: frontBackWallGeometry, pos: [0, wallHeight/2, -boundary - wallThickness/2], rot: [0, 0, 0] }, // Back wall
+                { geometry: frontBackWallGeometry, pos: [0, wallHeight/2, boundary + wallThickness/2], rot: [0, 0, 0] }   // Front wall
+            ];
+            
+            walls.forEach(wallConfig => {
+                const wall = new THREE.Mesh(wallConfig.geometry, wallMaterial);
+                wall.position.set(...wallConfig.pos);
+                wall.rotation.set(...wallConfig.rot);
+                scene.add(wall);
+                
+                // Add glow effect with matching geometry
+                const glowGeometry = wallConfig.geometry.clone();
+                glowGeometry.scale(1.2, 1.2, 1.2);
+                
+                const glowMaterial = new THREE.MeshBasicMaterial({
+                    color: 0x00ffff,
+                    transparent: true,
+                    opacity: 0.1
+                });
+                
+                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+                glow.position.copy(wall.position);
+                glow.rotation.copy(wall.rotation);
+                scene.add(glow);
+            });
+        }
+        
+        // Call createArenaWalls after grid setup
+        createArenaWalls();
         
         // Game state
         const players = [
@@ -215,6 +312,10 @@
         const minScale = 0.5;
         const maxScale = 1.0;
         const scaleStep = 0.05;
+        
+        let isAIEnabled = false;
+        const aiUpdateInterval = 100; // AI decision making interval in ms
+        let lastAIUpdate = 0;
         
         function updateFPS() {
             frameCount++;
@@ -290,14 +391,11 @@
             player.tail.push(segment);
             
             // Optimize tail length
-            if (player.tail.length > 50) {
+            if (player.tail.length > 500) {
                 const oldestSegment = player.tail.shift();
                 scene.remove(oldestSegment);
             }
         }
-        
-        // Game boundaries
-        const boundary = gridSize / 2 - 1;
         
         // Control handlers
         document.getElementById('leftBtnP1').addEventListener('click', () => turnLeft(0));
@@ -387,15 +485,136 @@
         function gameOver(playerIndex) {
             players[playerIndex].isAlive = false;
             
-            // Check if both players are dead (tie) or declare winner
-            if (!players[0].isAlive && !players[1].isAlive) {
-                document.getElementById('winnerText').textContent = "TIE GAME!";
-            } else {
-                const winner = playerIndex === 0 ? "PLAYER 2" : "PLAYER 1";
-                document.getElementById('winnerText').textContent = `${winner} WINS!`;
+            // Simply declare the other player as winner
+            const winner = playerIndex === 0 ? "PLAYER 2" : "PLAYER 1";
+            document.getElementById('winnerText').textContent = `${winner} WINS!`;
+            
+            // Force display of game over screen
+            const gameOverElement = document.getElementById('gameOver');
+            gameOverElement.style.display = 'block';
+        }
+        
+        function updateAI(currentTime) {
+            if (!isAIEnabled || !players[1].isAlive) return;
+            
+            // Only update AI decisions periodically
+            if (currentTime - lastAIUpdate < aiUpdateInterval) return;
+            lastAIUpdate = currentTime;
+            
+            const player = players[1];
+            const opponent = players[0];
+            const currentPos = player.position;
+            const direction = player.direction;
+            
+            // Look ahead in multiple directions
+            const lookAheadDistance = 10;
+            const directions = {
+                current: direction.clone(),
+                left: new THREE.Vector3(direction.z, 0, -direction.x),
+                right: new THREE.Vector3(-direction.z, 0, direction.x)
+            };
+            
+            // Score each possible direction
+            const scores = {};
+            for (const [dirName, dir] of Object.entries(directions)) {
+                scores[dirName] = evaluateDirection(player, opponent, currentPos, dir, lookAheadDistance);
             }
             
-            document.getElementById('gameOver').style.display = 'block';
+            // Choose the best direction
+            const bestDirection = Object.entries(scores).reduce((a, b) => b[1] > a[1] ? b : a)[0];
+            
+            if (bestDirection === 'left') {
+                turnLeft(1);
+            } else if (bestDirection === 'right') {
+                turnRight(1);
+            }
+        }
+        
+        function evaluateDirection(player, opponent, currentPos, direction, lookAheadDistance) {
+            let score = 100; // Base score
+            
+            // Check multiple points along the path
+            for (let dist = 1; dist <= lookAheadDistance; dist++) {
+                const checkPos = currentPos.clone().add(direction.clone().multiplyScalar(dist));
+                
+                // Heavy penalty for wall collisions
+                if (
+                    checkPos.x < -boundary || 
+                    checkPos.x > boundary || 
+                    checkPos.z < -boundary || 
+                    checkPos.z > boundary
+                ) {
+                    score -= 1000 / dist; // Penalty reduces with distance
+                    continue;
+                }
+                
+                // Check for tail collisions
+                const tailCollision = checkTailCollision(checkPos, player, opponent);
+                if (tailCollision) {
+                    score -= 800 / dist;
+                    continue;
+                }
+                
+                // Reward for moving into open space
+                score += evaluateOpenSpace(checkPos, player, opponent) / dist;
+                
+                // Reward for moving towards opponent
+                const distToOpponent = checkPos.distanceTo(opponent.position);
+                score += (50 / distToOpponent) / dist;
+                
+                // Reward for moving towards center when near walls
+                const distToCenter = checkPos.length();
+                if (distToCenter > boundary * 0.7) {
+                    score -= distToCenter / dist;
+                }
+            }
+            
+            return score;
+        }
+        
+        function checkTailCollision(pos, player, opponent) {
+            // Check both players' tails
+            for (const p of [player, opponent]) {
+                for (const segment of p.tail) {
+                    const segPos = segment.userData.position;
+                    if (
+                        Math.abs(pos.x - segPos.x) < 1 && 
+                        Math.abs(pos.z - segPos.z) < 1
+                    ) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+        
+        function evaluateOpenSpace(pos, player, opponent) {
+            let openSpace = 0;
+            const checkRadius = 5;
+            
+            // Check surrounding area for obstacles
+            for (let x = -checkRadius; x <= checkRadius; x++) {
+                for (let z = -checkRadius; z <= checkRadius; z++) {
+                    const checkPos = new THREE.Vector3(pos.x + x, 0, pos.z + z);
+                    
+                    // Skip if outside arena
+                    if (
+                        checkPos.x < -boundary || 
+                        checkPos.x > boundary || 
+                        checkPos.z < -boundary || 
+                        checkPos.z > boundary
+                    ) {
+                        continue;
+                    }
+                    
+                    // If no collision, increment open space
+                    if (!checkTailCollision(checkPos, player, opponent)) {
+                        openSpace++;
+                    }
+                }
+            }
+            
+            return openSpace;
         }
         
         function restartGame() {
@@ -413,6 +632,11 @@
             });
             
             document.getElementById('gameOver').style.display = 'none';
+            
+            // Update AI toggle state
+            const aiToggle = document.getElementById('aiToggle');
+            aiToggle.textContent = `AI: ${isAIEnabled ? 'ON' : 'OFF'}`;
+            aiToggle.classList.toggle('active', isAIEnabled);
         }
         
         // Animation loop
@@ -421,14 +645,18 @@
             
             lastFrameTime = currentTime;
             updateFPS();
+            updateAI(currentTime);
             
             players.forEach((player, index) => {
                 if (player.isAlive) {
                     player.position.add(player.direction.clone().multiplyScalar(player.speed));
                     player.mesh.position.copy(player.position);
-                    
-                    createTailSegment(player.position.clone(), index);
-                    
+
+                    // Only create a tail segment every other frame
+                    if (frameCount % 2 === 0) {
+                        createTailSegment(player.position.clone(), index);
+                    }
+
                     if (checkCollision(index)) {
                         gameOver(index);
                     }
@@ -475,6 +703,14 @@
         
         window.addEventListener('resize', resizeRendererToDisplaySize);
         resizeRendererToDisplaySize(); // Call immediately to set correct size
+        
+        // Add this event listener after the other control handlers
+        document.getElementById('aiToggle').addEventListener('click', () => {
+            isAIEnabled = !isAIEnabled;
+            const aiToggle = document.getElementById('aiToggle');
+            aiToggle.textContent = `AI: ${isAIEnabled ? 'ON' : 'OFF'}`;
+            aiToggle.classList.toggle('active', isAIEnabled);
+        });
         
         // Initialize the game
         animate();
