@@ -31,10 +31,10 @@
             gap: 20px;
         }
         #player1Controls {
-            top: 20px;
+            bottom: 20px;
         }
         #player2Controls {
-            bottom: 20px;
+            top: 20px;
         }
         .button {
             background-color: rgba(0,0,0,0.5);
@@ -179,13 +179,13 @@
         <button class="restart" onclick="restartGame()">RESTART</button>
     </div>
     
-    <div class="controls" id="player1Controls">
-        <button class="button blue" id="leftBtnP1">←</button>
-        <button class="button blue" id="rightBtnP1">→</button>
-    </div>
     <div class="controls" id="player2Controls">
         <button class="button red" id="leftBtnP2">←</button>
         <button class="button red" id="rightBtnP2">→</button>
+    </div>
+    <div class="controls" id="player1Controls">
+        <button class="button blue" id="leftBtnP1">←</button>
+        <button class="button blue" id="rightBtnP1">→</button>
     </div>
     <div id="fps" class="fps-counter">FPS: 60</div>
     <button id="aiToggle" class="ai-toggle">AI: OFF</button>
@@ -340,15 +340,16 @@
         }
         
         function updateResolution() {
-            const width = window.innerWidth * resolutionScale;
-            const height = window.innerHeight * resolutionScale;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
             
             renderer.setSize(width, height, false);
             renderer.domElement.style.width = '100vw';
             renderer.domElement.style.height = '100vh';
             
+            const halfHeight = Math.floor(height / 2);
             players.forEach(player => {
-                player.camera.aspect = width / (height/2);
+                player.camera.aspect = width / halfHeight;
                 player.camera.updateProjectionMatrix();
             });
         }
@@ -365,6 +366,12 @@
             const playerLight = new THREE.PointLight(player.color, 1, 50);
             playerLight.position.set(0, 20, 0);
             player.mesh.add(playerLight);
+            
+            // Add camera target and lerp settings to each player
+            player.cameraTarget = {
+                position: new THREE.Vector3(),
+                lookAt: new THREE.Vector3()
+            };
         });
         
         // Tail segment creation function
@@ -660,45 +667,80 @@
                     if (checkCollision(index)) {
                         gameOver(index);
                     }
+                    
+                    // Update camera target position - position it behind the player
+                    const cameraOffset = player.direction.clone().multiplyScalar(-15); // Distance behind player
+                    cameraOffset.y = 10; // Height of camera
+                    player.cameraTarget.position.copy(player.position).add(cameraOffset);
+                    
+                    // Update camera look-at target - look ahead of the player
+                    const lookAtOffset = player.direction.clone().multiplyScalar(10);
+                    player.cameraTarget.lookAt.copy(player.position).add(lookAtOffset);
+                    
+                    // Smoothly interpolate camera position and lookAt
+                    const lerpFactor = 0.05;
+                    player.camera.position.lerp(player.cameraTarget.position, lerpFactor);
+                    
+                    // Create a temporary vector for the current lookAt
+                    const currentLookAt = new THREE.Vector3();
+                    player.camera.getWorldDirection(currentLookAt);
+                    
+                    // Calculate the target direction
+                    const targetDirection = player.cameraTarget.lookAt.clone().sub(player.camera.position).normalize();
+                    
+                    // Interpolate the direction
+                    const resultDirection = currentLookAt.lerp(targetDirection, lerpFactor);
+                    
+                    // Update camera look-at
+                    player.camera.lookAt(
+                        player.camera.position.clone().add(resultDirection)
+                    );
                 }
-                
-                // Update camera for this player
-                player.camera.position.x = player.mesh.position.x;
-                player.camera.position.z = player.mesh.position.z + 10;
-                player.camera.position.y = 50;
-                player.camera.lookAt(player.mesh.position);
             });
             
-            // Render split screen top/bottom
-            const canvas = renderer.domElement;
-            
-            // Top half - Player 1
-            renderer.setViewport(0, window.innerHeight/2, window.innerWidth, window.innerHeight/2);
-            renderer.setScissor(0, window.innerHeight/2, window.innerWidth, window.innerHeight/2);
+            // Calculate viewport dimensions using window dimensions
+            const fullWidth = window.innerWidth;
+            const fullHeight = window.innerHeight;
+            const halfHeight = Math.floor(fullHeight / 2);
+
+            // Top half - Player 2
+            renderer.setViewport(0, halfHeight, fullWidth, halfHeight);
+            renderer.setScissor(0, halfHeight, fullWidth, halfHeight);
             renderer.setScissorTest(true);
-            renderer.render(scene, players[0].camera);
-            
-            // Bottom half - Player 2
-            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight/2);
-            renderer.setScissor(0, 0, window.innerWidth, window.innerHeight/2);
-            renderer.setScissorTest(true);
+            players[1].camera.aspect = fullWidth / halfHeight;
+            players[1].camera.updateProjectionMatrix();
             renderer.render(scene, players[1].camera);
+            
+            // Bottom half - Player 1
+            renderer.setViewport(0, 0, fullWidth, halfHeight);
+            renderer.setScissor(0, 0, fullWidth, halfHeight);
+            renderer.setScissorTest(true);
+            players[0].camera.aspect = fullWidth / halfHeight;
+            players[0].camera.updateProjectionMatrix();
+            renderer.render(scene, players[0].camera);
         }
         
-        // Replace the existing resizeRendererToDisplaySize function
+        // Update the resizeRendererToDisplaySize function
         function resizeRendererToDisplaySize() {
-            const width = window.innerWidth * resolutionScale;
-            const height = window.innerHeight * resolutionScale;
+            const width = window.innerWidth;
+            const height = window.innerHeight;
             
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-            renderer.setSize(width, height, false);
-            renderer.domElement.style.width = '100vw';
-            renderer.domElement.style.height = '100vh';
+            const needsResize = renderer.domElement.width !== width ||
+                               renderer.domElement.height !== height;
             
-            players.forEach(player => {
-                player.camera.aspect = width / (height/2);
-                player.camera.updateProjectionMatrix();
-            });
+            if (needsResize) {
+                renderer.setSize(width, height, false);
+                renderer.domElement.style.width = '100vw';
+                renderer.domElement.style.height = '100vh';
+                
+                const halfHeight = Math.floor(height / 2);
+                players.forEach(player => {
+                    player.camera.aspect = width / halfHeight;
+                    player.camera.updateProjectionMatrix();
+                });
+            }
+            
+            return needsResize;
         }
         
         window.addEventListener('resize', resizeRendererToDisplaySize);
