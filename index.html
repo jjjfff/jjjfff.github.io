@@ -142,11 +142,11 @@
       // Center the drawing
       ctx.translate(canvas.width / 2, canvas.height / 2);
       // Rotate
-      ctx.rotate(260 * Math.PI / 180); // Set rotation to 110 degrees
+      ctx.rotate(270 * Math.PI / 180); // Set rotation to 110 degrees
 
       // Text properties
       ctx.fillStyle = '#000000'; // Black text
-      ctx.font = 'bold 90px Arial, sans-serif'; // Modern font
+      ctx.font = 'bold 120px Arial, sans-serif'; // Modern font
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       const text = "emoji-flip";
@@ -158,7 +158,7 @@
       const textMetrics = ctx.measureText(text);
       const textWidth = textMetrics.width;
       // Adjust padding for the box
-      const padding = 20;
+      const padding = 40;
       const rectWidth = textWidth + 2 * padding;
       const rectHeight = 60 + 2 * padding; // Font size + padding
       ctx.strokeRect(-rectWidth / 2, -rectHeight / 2, rectWidth, rectHeight);
