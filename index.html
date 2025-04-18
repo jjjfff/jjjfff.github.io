@@ -1,987 +1,529 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tron-like Game - 3D Top Down with Neon Glow</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <style>
-        body { 
-            margin: 0; 
-            overflow: hidden; 
-            background-color: #000;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            font-family: 'Courier New', monospace;
-        }
-        canvas { 
-            display: block; 
-            width: 100vw !important;
-            height: 100vh !important;
-        }
-        .controls {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
-            display: flex;
-            z-index: 100;
-            gap: 20px;
-        }
-        #player1Controls {
-            bottom: 20px;
-        }
-        #player2Controls {
-            top: 20px;
-        }
-        .button {
-            background-color: rgba(0,0,0,0.5);
-            border: 2px solid #0ff;
-            color: #0ff;
-            padding: 15px 30px;
-            margin: 0 20px;
-            font-size: 24px;
-            cursor: pointer;
-            border-radius: 5px;
-            box-shadow: 0 0 15px #0ff;
-            transition: all 0.3s ease;
-            min-width: 80px;
-        }
-        .button:hover {
-            background-color: rgba(0,255,255,0.2);
-            box-shadow: 0 0 25px #0ff;
-        }
-        .game-over {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #f00;
-            font-size: 48px;
-            text-shadow: 0 0 20px #f00;
-            display: none;
-            z-index: 1000;
-            text-align: center;
-            width: 100%;
-            padding: 20px;
-            font-family: 'Courier New', monospace;
-            background-color: rgba(0, 0, 0, 0.9);
-            backdrop-filter: blur(5px);
-        }
-        #winnerText {
-            display: block;
-            margin-bottom: 30px;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-        .restart {
-            background-color: rgba(0,0,0,0.5);
-            border: 2px solid #f00;
-            color: #f00;
-            padding: 15px 30px;
-            margin-top: 20px;
-            font-size: 24px;
-            cursor: pointer;
-            border-radius: 5px;
-            box-shadow: 0 0 15px #f00;
-            transition: all 0.3s ease;
-            font-family: 'Courier New', monospace;
-            display: block;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        .restart:hover {
-            background-color: rgba(255,0,0,0.2);
-            box-shadow: 0 0 25px #f00;
-        }
-        .player1-controls, .player2-controls {
-            display: flex;
-            margin: 0 20px;
-        }
-        .blue {
-            border-color: #0ff;
-            color: #0ff;
-            box-shadow: 0 0 15px #0ff;
-        }
-        .blue:hover {
-            background-color: rgba(0,255,255,0.2);
-            box-shadow: 0 0 25px #0ff;
-        }
-        .red {
-            border-color: #f00;
-            color: #f00;
-            box-shadow: 0 0 15px #f00;
-        }
-        .red:hover {
-            background-color: rgba(255,0,0,0.2);
-            box-shadow: 0 0 25px #f00;
-        }
-        .fps-counter {
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            color: #0f0;
-            font-family: monospace;
-            font-size: 16px;
-            z-index: 100;
-            text-shadow: 0 0 5px #0f0;
-        }
-        .ai-toggle {
-            position: absolute;
-            right: 20px;
-            top: 20px;
-            background-color: rgba(0,0,0,0.5);
-            border: 2px solid #f00;
-            color: #f00;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            border-radius: 5px;
-            box-shadow: 0 0 15px #f00;
-            transition: all 0.3s ease;
-            z-index: 100;
-        }
-        
-        .ai-toggle:hover {
-            background-color: rgba(255,0,0,0.2);
-            box-shadow: 0 0 25px #f00;
-        }
-        
-        .ai-toggle.active {
-            border-color: #0f0;
-            color: #0f0;
-            box-shadow: 0 0 15px #0f0;
-        }
-        
-        .ai-toggle.active:hover {
-            background-color: rgba(0,255,0,0.2);
-            box-shadow: 0 0 25px #0f0;
-        }
-        
-        /* Add responsive styles for mobile */
-        @media (max-width: 768px) {
-            .game-over {
-                font-size: 32px;
-                padding: 10px;
-            }
-            .restart {
-                font-size: 20px;
-                padding: 12px 24px;
-            }
-        }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Swipe Coin Flip</title>
+  <style>
+    body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
+    canvas { display: block; }
+    #ui {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      background: rgba(0, 0, 0, 0.7);
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 10; /* Ensure UI is above messages */
+    }
+    .temporary-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.8); /* Start slightly smaller */
+      color: white;
+      font-size: 4em; /* Large text */
+      font-weight: bold;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.75);
+      padding: 20px 40px;
+      border-radius: 10px;
+      opacity: 0;
+      transition: opacity 0.5s ease-out, transform 0.5s ease-out; /* Smooth fade and scale */
+      pointer-events: none; /* Don't interfere with interactions */
+      z-index: 5; /* Below main UI but above canvas */
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.5); /* Add shadow for readability */
+    }
+    .temporary-message.show {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1); /* Scale to full size */
+    }
+  </style>
 </head>
 <body>
-    <div class="game-over" id="gameOver">
-        <span id="winnerText"></span>
-        <button class="restart" onclick="restartGame()">RESTART</button>
-    </div>
-    
-    <div class="controls" id="player2Controls">
-        <button class="button red" id="leftBtnP2">←</button>
-        <button class="button red" id="rightBtnP2">→</button>
-    </div>
-    <div class="controls" id="player1Controls">
-        <button class="button blue" id="leftBtnP1">←</button>
-        <button class="button blue" id="rightBtnP1">→</button>
-    </div>
-    <div id="fps" class="fps-counter">FPS: 60</div>
-    <button id="aiToggle" class="ai-toggle">AI: OFF</button>
+  <div id="ui">
+    <div>Streak: <span id="streak">0</span></div>
+    <div>Highest Streak: <span id="highestStreak">0</span></div>
+    <div>Results: <span id="results"></span></div>
+    <div>FPS: <span id="fps">0</span></div>
+  </div>
 
-    <script>
-        // Set up Three.js scene
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x000000);
-        
-        // Camera setup
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 50, 0);
-        camera.lookAt(0, 0, 0);
-        camera.rotation.z = Math.PI; // Rotate camera to make forward direction intuitive
-        
-        // Renderer setup
-        const renderer = new THREE.WebGLRenderer({ 
-            antialias: true,
-            powerPreference: "high-performance"
+  <!-- Temporary Message Elements -->
+  <div id="streakFlash" class="temporary-message"></div>
+  <div id="streakRecap" class="temporary-message"></div>
+  <div id="streakLostMessage" class="temporary-message"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cannon.js/0.6.2/cannon.min.js"></script>
+  <script>
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xff5733);
+
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+    const originalCameraPosition = new THREE.Vector3(0, 3, 5);
+    camera.position.copy(originalCameraPosition);
+    camera.lookAt(0, 0, 1.5);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    document.body.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.PointLight(0xf7fafc, 0.7);
+    directionalLight.position.set(0.6, 5, -5);
+    directionalLight.castShadow = true;
+    directionalLight.shadow.camera.far = 50;
+    directionalLight.shadow.mapSize.width = 1024;
+    directionalLight.shadow.mapSize.height = 1024;
+    directionalLight.shadow.radius = 5;
+    scene.add(directionalLight);
+
+    const lightTarget = new THREE.Object3D();
+    lightTarget.position.set(3, -1, 3);
+    scene.add(lightTarget);
+    directionalLight.target = lightTarget;
+
+    const world = new CANNON.World();
+    world.gravity.set(0, -19.62, 0);
+
+    function createGroundTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 2048;
+      canvas.height = 2048;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#ff5733';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      ctx.rotate(20 * Math.PI / 180);
+
+      ctx.fillStyle = '#000000';
+      ctx.font = 'bold 100px "Roboto", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('flip', 0, 0);
+
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 5;
+      const textMetrics = ctx.measureText('flip');
+      const textWidth = textMetrics.width;
+      const textHeight = 100;
+      ctx.strokeRect(-textWidth / 2 - 10, -textHeight / 2 - 10, textWidth + 20, textHeight + 20);
+
+      ctx.restore();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.offset.set(0.5 - 0.005, 0.5 - 0.005);
+      texture.wrapS = THREE.ClampToEdgeWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      return texture;
+    }
+
+    const groundMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(500, 500),
+      new THREE.MeshStandardMaterial({ 
+        map: createGroundTexture(),
+        color: 0xd1d8e0
+      })
+    );
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    const groundBody = new CANNON.Body({
+      mass: 0,
+      shape: new CANNON.Plane(),
+      material: new CANNON.Material()
+    });
+    groundBody.quaternion.setFromEuler(-Math.PI / 2, 0, 0);
+    world.addBody(groundBody);
+
+    const cylinderMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(2, 2, 0.5, 64),
+      new THREE.MeshStandardMaterial({
+        color: '#ff5733',
+        metalness: 0.0,
+        roughness: 0.5
+      })
+    );
+    cylinderMesh.position.set(0, -0.2, 0);
+    cylinderMesh.castShadow = true;
+    cylinderMesh.receiveShadow = true;
+    scene.add(cylinderMesh);
+
+    const cylinderShape = new CANNON.Cylinder(2, 2, 0.5, 64);
+    const cylinderBody = new CANNON.Body({
+      mass: 0,
+      shape: cylinderShape,
+      material: new CANNON.Material()
+    });
+    cylinderBody.position.set(0, -0.2, 0);
+    const quat = new CANNON.Quaternion();
+    quat.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+    cylinderShape.transformAllPoints(new CANNON.Vec3(), quat);
+    world.addBody(cylinderBody);
+
+    let streak = 0;
+    let highestStreak = 0;
+    let streakMaterials = [];
+    let grimaceMaterials = [];
+    let previousStreak = 0; // Keep track of the previous streak
+    let messageTimeout = null; // To manage message display timing
+
+    // Emoji sequence for increasing streak drama
+    const emojiSequence = ['😊', '😄', '😎', '😮', '😲', '🤯'];
+    const grimaceEmoji = '😬';
+
+    function createTextTexture(text) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = '#2d3748';
+      ctx.font = '800px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+      const colorTexture = new THREE.CanvasTexture(canvas);
+
+      const bumpCanvas = canvas.cloneNode();
+      const bumpCtx = bumpCanvas.getContext('2d');
+      bumpCtx.fillStyle = '#d1e3ff';
+      bumpCtx.fillRect(0, 0, 1024, 1024);
+      bumpCtx.fillStyle = '#2d3748';
+      bumpCtx.font = '800px Arial';
+      bumpCtx.textAlign = 'center';
+      bumpCtx.textBaseline = 'middle';
+      bumpCtx.fillText(text, 512, 512);
+
+      const bumpTexture = new THREE.CanvasTexture(bumpCanvas);
+      return { colorTexture, bumpTexture };
+    }
+
+    // Get references to message elements
+    const streakFlashEl = document.getElementById('streakFlash');
+    const streakRecapEl = document.getElementById('streakRecap');
+    const streakLostEl = document.getElementById('streakLostMessage');
+
+    // Helper function to show temporary messages
+    function showTemporaryMessage(element, text, duration = 1500) {
+      // Clear any existing message timeout to prevent overlaps
+      if (messageTimeout) {
+        clearTimeout(messageTimeout);
+        // Immediately hide previous messages if a new one comes quickly
+        streakFlashEl.classList.remove('show');
+        streakRecapEl.classList.remove('show');
+        streakLostEl.classList.remove('show');
+      }
+
+      element.textContent = text;
+      element.classList.add('show');
+
+      messageTimeout = setTimeout(() => {
+        element.classList.remove('show');
+        messageTimeout = null; // Clear the timeout reference
+      }, duration);
+    }
+
+    // Function to create materials based on a text/emoji
+    function createMaterialsFromText(text) {
+      const textures = createTextTexture(text);
+      return [
+        new THREE.MeshStandardMaterial({ 
+          color: '#FFFFFF', // Edge color
+          metalness: 0.0, 
+          roughness: 0.15 
+        }),
+        new THREE.MeshStandardMaterial({ // Heads face (using the provided text)
+          map: textures.colorTexture,
+          bumpMap: textures.bumpTexture,
+          bumpScale: 0.05,
+          metalness: 0.0,
+          roughness: 0.15
+        }),
+        new THREE.MeshStandardMaterial({ // Tails face (blank)
+          map: createTextTexture(' ').colorTexture, // Keep tails blank
+          bumpMap: createTextTexture(' ').bumpTexture,
+          bumpScale: -0.05,
+          metalness: 0.0,
+          roughness: 0.15
+        })
+      ];
+    }
+
+    // Updates the materials used for the settled coin based on streak
+    function updateStreakMaterials() {
+      // Select emoji based on streak
+      // Change emoji every 3 streaks
+      const emojiIndex = Math.floor(streak / 3);
+      const headsText = emojiSequence[Math.min(emojiIndex, emojiSequence.length - 1)];
+      streakMaterials = createMaterialsFromText(headsText);
+    }
+
+    // Initialize materials
+    grimaceMaterials = createMaterialsFromText(grimaceEmoji);
+    updateStreakMaterials(); // Initialize streakMaterials based on initial streak (0)
+
+    const coins = [];
+    let results = [];
+    let isCoinSettled = true;
+    let flipStartTime = 0;
+
+    // Camera shake variables
+    let shakeTime = 0;
+    const shakeDuration = 0.5; // seconds
+    const shakeAmplitude = 1.1; // units
+
+    function createCoin(velocityY = 10, velocityZ = 2, velocityX = 0, spin = 50) {
+      try {
+        // Clear all existing coins
+        coins.forEach(({ mesh, body }) => {
+          scene.remove(mesh);
+          world.remove(body);
         });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        document.body.insertBefore(renderer.domElement, document.body.firstChild);
-        
-        // Add ambient light to the scene for better performance
-        const ambientLight = new THREE.AmbientLight(0x404040);
-        scene.add(ambientLight);
-        
-        // Grid setup
-        const gridSize = 150;
-        const gridDivisions = 100;
-        const boundary = gridSize / 2 - 1;
-        const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x0088ff, 0x0033aa);
-        scene.add(gridHelper);
-        
-        // Add arena walls
-        function createArenaWalls() {
-            const wallHeight = 10;
-            const wallThickness = 1;
-            
-            // Create side walls (longer to account for corners)
-            const sideWallGeometry = new THREE.BoxGeometry(wallThickness, wallHeight, gridSize);
-            const frontBackWallGeometry = new THREE.BoxGeometry(gridSize + wallThickness * 2, wallHeight, wallThickness);
-            
-            const wallMaterial = new THREE.MeshBasicMaterial({
-                color: 0x0088ff,
-                transparent: true,
-                opacity: 0.3
-            });
-            
-            // Create walls with adjusted positions
-            const walls = [
-                // Side walls
-                { geometry: sideWallGeometry, pos: [-boundary - wallThickness/2, wallHeight/2, 0], rot: [0, 0, 0] },     // Left wall
-                { geometry: sideWallGeometry, pos: [boundary + wallThickness/2, wallHeight/2, 0], rot: [0, 0, 0] },      // Right wall
-                // Front/back walls (wider to connect with side walls)
-                { geometry: frontBackWallGeometry, pos: [0, wallHeight/2, -boundary - wallThickness/2], rot: [0, 0, 0] }, // Back wall
-                { geometry: frontBackWallGeometry, pos: [0, wallHeight/2, boundary + wallThickness/2], rot: [0, 0, 0] }   // Front wall
-            ];
-            
-            walls.forEach(wallConfig => {
-                const wall = new THREE.Mesh(wallConfig.geometry, wallMaterial);
-                wall.position.set(...wallConfig.pos);
-                wall.rotation.set(...wallConfig.rot);
-                scene.add(wall);
-                
-                // Add glow effect with matching geometry
-                const glowGeometry = wallConfig.geometry.clone();
-                glowGeometry.scale(1.2, 1.2, 1.2);
-                
-                const glowMaterial = new THREE.MeshBasicMaterial({
-                    color: 0x00ffff,
-                    transparent: true,
-                    opacity: 0.1
-                });
-                
-                const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-                glow.position.copy(wall.position);
-                glow.rotation.copy(wall.rotation);
-                scene.add(glow);
-            });
-        }
-        
-        // Call createArenaWalls after grid setup
-        createArenaWalls();
-        
-        // Game state
-        const players = [
-            {
-                speed: 0.5,
-                direction: new THREE.Vector3(0, 0, -1),
-                position: new THREE.Vector3(-20, 0, 20),
-                tail: [],
-                color: 0x00ffff,
-                camera: null,
-                mesh: null,
-                isAlive: true,
-                lastCornerPoint: null,
-                distanceSinceLastSegment: 0
-            },
-            {
-                speed: 0.5,
-                direction: new THREE.Vector3(0, 0, -1),
-                position: new THREE.Vector3(20, 0, 20),
-                tail: [],
-                color: 0xff0000,
-                camera: null,
-                mesh: null,
-                isAlive: true,
-                lastCornerPoint: null,
-                distanceSinceLastSegment: 0
-            }
-        ];
-        
-        // Setup cameras
-        players[0].camera = new THREE.PerspectiveCamera(75, window.innerWidth / 2 / window.innerHeight, 0.1, 1000);
-        players[1].camera = new THREE.PerspectiveCamera(75, window.innerWidth / 2 / window.innerHeight, 0.1, 1000);
-        
-        // FPS tracking
-        let frameCount = 0;
-        let lastTime = performance.now();
-        const fpsElement = document.getElementById('fps');
-        let lastFrameTime = 0;
-        
-        // Add these variables near the FPS tracking section
-        let resolutionScale = 1.0;
-        const targetFPS = 50;
-        const minScale = 0.5;
-        const maxScale = 1.0;
-        const scaleStep = 0.05;
-        
-        let isAIEnabled = false;
-        const aiUpdateInterval = 100; // AI decision making interval in ms
-        let lastAIUpdate = 0;
-        
-        function updateFPS() {
-            frameCount++;
-            const currentTime = performance.now();
-            
-            if (currentTime >= lastTime + 1000) {
-                const fps = Math.round((frameCount * 1000) / (currentTime - lastTime));
-                fpsElement.textContent = `FPS: ${fps}`;
-                
-                // Adjust resolution scale based on FPS
-                if (fps < targetFPS && resolutionScale > minScale) {
-                    resolutionScale = Math.max(resolutionScale - scaleStep, minScale);
-                    updateResolution();
-                } else if (fps > targetFPS + 10 && resolutionScale < maxScale) {
-                    resolutionScale = Math.min(resolutionScale + scaleStep, maxScale);
-                    updateResolution();
-                }
-                
-                frameCount = 0;
-                lastTime = currentTime;
-            }
-        }
-        
-        function updateResolution() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            
-            renderer.setSize(width, height, false);
-            renderer.domElement.style.width = '100vw';
-            renderer.domElement.style.height = '100vh';
-            
-            const halfHeight = Math.floor(height / 2);
-            players.forEach(player => {
-                player.camera.aspect = width / halfHeight;
-                player.camera.updateProjectionMatrix();
-            });
-        }
-        
-        // Setup players
-        players.forEach((player, index) => {
-            const playerGeometry = new THREE.BoxGeometry(1, 0.5, 2, 8, 4, 8);
-            const playerMaterial = new THREE.MeshBasicMaterial({ color: player.color });
-            player.mesh = new THREE.Mesh(playerGeometry, playerMaterial);
-            player.mesh.position.copy(player.position);
-            scene.add(player.mesh);
-            
-            // Add one static light per player instead of many small lights
-            const playerLight = new THREE.PointLight(player.color, 1, 50);
-            playerLight.position.set(0, 20, 0);
-            player.mesh.add(playerLight);
-            
-            // Add camera target and lerp settings to each player
-            player.cameraTarget = {
-                position: new THREE.Vector3(),
-                lookAt: new THREE.Vector3()
-            };
+        coins.length = 0;
+
+        // No need to update materials here anymore
+        // updateCoinMaterials(); // REMOVED
+
+        const mesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32),
+          grimaceMaterials // Use grimace materials initially
+        );
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        scene.add(mesh);
+
+        const shape = new CANNON.Cylinder(0.5, 0.5, 0.1, 32);
+        const quat = new CANNON.Quaternion();
+        quat.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), Math.PI / 2);
+        shape.transformAllPoints(new CANNON.Vec3(), quat);
+
+        const body = new CANNON.Body({
+          mass: 10,
+          shape: shape,
+          material: new CANNON.Material()
         });
-        
-        // Tail segment creation function
-        function createTailSegment(position, playerIndex) {
-            const player = players[playerIndex];
-            const baseSegmentHeight = 3; // Reduced from 8 to 3
-            const width = 0.2;
-            
-            // If this is a corner point, store it
-            if (player.lastCornerPoint === null) {
-                player.lastCornerPoint = position.clone();
-                return;
+        body.position.set(0, 1, 4);
+        body.velocity.set(velocityX, velocityY, velocityZ);
+        body.angularVelocity.set(
+          Math.min(Math.random() * spin, -25),
+          (Math.random() - 0.5) * spin * 0.1,
+          (Math.random() - 0.5) * spin * 0.1
+        );
+        world.addBody(body);
+
+        const coinGroundContact = new CANNON.ContactMaterial(
+          groundBody.material,
+          body.material,
+          { friction: 0.5, restitution: 0.3 }
+        );
+        const coinCylinderContact = new CANNON.ContactMaterial(
+          cylinderBody.material,
+          body.material,
+          { friction: 0.5, restitution: 0.3 }
+        );
+        world.addContactMaterial(coinGroundContact);
+        world.addContactMaterial(coinCylinderContact);
+
+        coins.push({ mesh, body });
+        isCoinSettled = false;
+        flipStartTime = performance.now();
+        console.log('Coin created');
+      } catch (error) {
+        console.error('Error creating coin:', error);
+      }
+    }
+
+    function checkCoinResult() {
+      if (coins.length === 0 || isCoinSettled) return;
+
+      const coin = coins[coins.length - 1]; // Check newest coin
+      const velocity = coin.body.velocity;
+      const angularVelocity = coin.body.angularVelocity;
+      let previousStreak = streak; // Store current streak before potentially changing it
+
+      // Check if coin has settled
+      if (
+        Math.abs(velocity.x) < 0.1 &&
+        Math.abs(velocity.y) < 0.1 &&
+        Math.abs(velocity.z) < 0.1 &&
+        Math.abs(angularVelocity.x) < 0.1 &&
+        Math.abs(angularVelocity.y) < 0.1 &&
+        Math.abs(angularVelocity.z) < 0.1
+      ) {
+        try {
+          // Get the up vector of the coin in world coordinates
+          const up = new THREE.Vector3(0, 1, 0); // Local up for heads
+          const worldUp = up.applyQuaternion(coin.mesh.quaternion);
+
+          // Check if coin is heads
+          const dot = worldUp.dot(new THREE.Vector3(0, 1, 0));
+          const result = dot > 0 ? 'H' : 'T';
+          const displayResult = dot > 0 ? '😊' : '❌'; // Use emojis for display
+
+          // Update streak BEFORE updating materials
+          if (result === 'H') {
+            streak++;
+            if (streak > highestStreak) {
+              highestStreak = streak;
+              document.getElementById('highestStreak').textContent = highestStreak;
             }
-            
-            // Calculate segment length based on distance to last corner, but slightly shorter to create gap
-            const totalLength = position.distanceTo(player.lastCornerPoint);
-            const gap = 0.3;
-            const length = Math.max(totalLength - gap, 0.1);
-            if (length < 0.1) return;
-            
-            // Calculate height based on position in the tail
-            let segmentHeight = baseSegmentHeight;
-            const fadeLength = 10; // Number of segments to fade
-            
-            if (player.tail.length < fadeLength) {
-                // Fade up at start
-                segmentHeight *= player.tail.length / fadeLength;
-            } else if (player.tail.length >= 250 - fadeLength) {
-                // Fade down at end
-                const distanceFromEnd = 250 - player.tail.length;
-                segmentHeight *= distanceFromEnd / fadeLength;
+            // Check for first time hitting streak of 2
+            if (streak === 2 && previousStreak < 2) {
+              showTemporaryMessage(streakFlashEl, "Streak of 2!", 2000);
+            } else if (streak > 0) { // Show recap for any ongoing streak
+              // Make recap message more exciting based on streak length
+              let recapMessage = `Streak: ${streak}!`;
+              if (streak >= 5) recapMessage = `🔥 Streak: ${streak}!! 🔥`;
+              else if (streak >= 3) recapMessage = `✨ Streak: ${streak}! ✨`;
+              showTemporaryMessage(streakRecapEl, recapMessage, 1500);
             }
-            
-            const tailGeometry = new THREE.BoxGeometry(width, segmentHeight, length, 4, 8, 4);
-            const tailMaterial = new THREE.MeshBasicMaterial({ 
-                color: player.color,
-                transparent: true,
-                opacity: 0.8
-            });
-            
-            const segment = new THREE.Mesh(tailGeometry, tailMaterial);
-            
-            // Position segment with offset to create gap
-            const direction = position.clone().sub(player.lastCornerPoint).normalize();
-            const segmentPos = player.lastCornerPoint.clone().add(direction.multiplyScalar(length/2));
-            segmentPos.y = segmentHeight / 2; // Center at half height
-            
-            segment.position.copy(segmentPos);
-            segment.userData.position = segmentPos.clone();
-            
-            // Calculate rotation based on direction between points
-            segment.rotation.y = Math.atan2(direction.x, direction.z);
-            
-            scene.add(segment);
-            player.tail.push(segment);
-            
-            // Update last corner point
-            player.lastCornerPoint = position.clone();
-            
-            // Optimize tail length and update heights of last segments
-            if (player.tail.length > 250) { // Changed from 500 to 250 for half length
-                const oldestSegment = player.tail.shift();
-                scene.remove(oldestSegment);
-                
-                // Update heights of last few segments for smooth fade out
-                for (let i = Math.max(0, player.tail.length - fadeLength); i < player.tail.length; i++) {
-                    const segment = player.tail[i];
-                    const distanceFromEnd = player.tail.length - i;
-                    const fadeHeight = baseSegmentHeight * (distanceFromEnd / fadeLength);
-                    segment.scale.y = fadeHeight / baseSegmentHeight;
-                    segment.position.y = fadeHeight / 2;
-                }
+          } else {
+            // Check if a streak was active before this flip
+            if (streak > 0) {
+              showTemporaryMessage(streakLostEl, "Streak Lost!", 2000);
             }
+            streak = 0;
+          }
+
+          // Update streak materials based on the new streak
+          updateStreakMaterials();
+          // Apply the updated streak materials to the settled coin
+          coin.mesh.material = streakMaterials;
+
+          results.push(displayResult); // Store emoji for results
+          if (results.length > 10) results.shift();
+
+          // Update UI
+          document.getElementById('streak').textContent = streak;
+          document.getElementById('results').textContent = results.join(' ');
+
+          isCoinSettled = true;
+          console.log(`Coin settled: ${displayResult}, Streak: ${streak}, Highest Streak: ${highestStreak}`);
+        } catch (error) {
+          console.error('Error checking coin result:', error);
         }
-        
-        // Control handlers
-        document.getElementById('leftBtnP1').addEventListener('click', () => turnLeft(0));
-        document.getElementById('rightBtnP1').addEventListener('click', () => turnRight(0));
-        document.getElementById('leftBtnP2').addEventListener('click', () => turnLeft(1));
-        document.getElementById('rightBtnP2').addEventListener('click', () => turnRight(1));
-        
-        document.addEventListener('keydown', (event) => {
-            if (event.key === 'a') turnLeft(0);
-            if (event.key === 'd') turnRight(0);
-            if (event.key === 'ArrowLeft') turnLeft(1);
-            if (event.key === 'ArrowRight') turnRight(1);
+      }
+
+      // Fallback: Force settlement if coin takes too long
+      if (performance.now() - flipStartTime > 10000) {
+        isCoinSettled = true;
+        results.push('?');
+        document.getElementById('results').textContent = results.join(' ');
+        console.warn('Coin failed to settle, marked as ?');
+      }
+    }
+
+    function shakeCamera(deltaTime) {
+      if (shakeTime < shakeDuration) {
+        shakeTime += deltaTime;
+        const intensity = shakeAmplitude * (1 - shakeTime / shakeDuration); // Damped effect
+        const offsetX = (Math.random() - 0.5) * intensity;
+        const offsetY = (Math.random() - 0.5) * intensity;
+        camera.position.set(
+          originalCameraPosition.x + offsetX,
+          originalCameraPosition.y + offsetY,
+          originalCameraPosition.z
+        );
+        camera.lookAt(0, 0, 1.5);
+      } else {
+        camera.position.copy(originalCameraPosition);
+        camera.lookAt(0, 0, 1.5);
+      }
+    }
+
+    let touchStartX = null;
+    let touchStartY = null;
+    let touchStartTime = null;
+
+    window.addEventListener('touchstart', e => {
+      const t = e.touches[0];
+      touchStartX = t.clientX;
+      touchStartY = t.clientY;
+      touchStartTime = performance.now();
+    });
+
+    window.addEventListener('touchend', e => {
+      if (touchStartY === null || touchStartX === null) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStartX;
+      const dy = touchStartY - t.clientY;
+      const dt = (performance.now() - touchStartTime) / 1000;
+
+      const velocityY = dy / dt / 100;
+      const velocityX = dx / dt / 300;
+
+      if (dy > 30) {
+        const spin = Math.min(velocityY * 10, 150);
+        createCoin(velocityY * 0.5, velocityY * -0.3, velocityX, spin);
+      }
+
+      touchStartX = null;
+      touchStartY = null;
+      touchStartTime = null;
+    });
+
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsUpdateTime = performance.now();
+    function animate() {
+      try {
+        requestAnimationFrame(animate);
+        const currentTime = performance.now();
+        const deltaTime = (currentTime - lastTime) / 1000;
+        lastTime = currentTime;
+
+        // FPS Calculation
+        frameCount++;
+        if (currentTime > lastFpsUpdateTime + 1000) {
+          const fps = Math.round(frameCount / ((currentTime - lastFpsUpdateTime) / 1000));
+          document.getElementById('fps').textContent = `FPS: ${fps}`;
+          lastFpsUpdateTime = currentTime;
+          frameCount = 0;
+        }
+
+        world.step(1 / 120, deltaTime); // Pass deltaTime as second argument
+
+        // Check for ground impact to trigger shake
+        coins.forEach(({ body }) => {
+          if (body.position.y < 0.1 && Math.abs(body.velocity.y) > 1 && shakeTime === 0) {
+            shakeTime = 0; // Start shake
+            console.log('Coin hit ground, shaking camera');
+          }
         });
-        
-        function turnLeft(playerIndex) {
-            if (!players[playerIndex].isAlive) return;
-            
-            // Create segment at corner point
-            createTailSegment(players[playerIndex].position.clone(), playerIndex);
-            
-            const oldDir = players[playerIndex].direction.clone();
-            players[playerIndex].direction.set(oldDir.z, 0, -oldDir.x);
-            updatePlayerRotation(playerIndex);
-        }
-        
-        function turnRight(playerIndex) {
-            if (!players[playerIndex].isAlive) return;
-            
-            // Create segment at corner point
-            createTailSegment(players[playerIndex].position.clone(), playerIndex);
-            
-            const oldDir = players[playerIndex].direction.clone();
-            players[playerIndex].direction.set(-oldDir.z, 0, oldDir.x);
-            updatePlayerRotation(playerIndex);
-        }
-        
-        function updatePlayerRotation(playerIndex) {
-            const player = players[playerIndex];
-            if (player.direction.x === 1) {
-                player.mesh.rotation.y = Math.PI / 2;
-            } else if (player.direction.x === -1) {
-                player.mesh.rotation.y = -Math.PI / 2;
-            } else if (player.direction.z === 1) {
-                player.mesh.rotation.y = 0;
-            } else if (player.direction.z === -1) {
-                player.mesh.rotation.y = Math.PI;
-            }
-        }
-        
-        function checkCollision(playerIndex) {
-            const player = players[playerIndex];
-            const currentPos = player.position.clone();
-            const playerSize = 1.2; // Increased further from 1.0 to 1.2
-            const playerLength = 2.0; // Account for bike length
-            
-            // Check arena boundaries with player size and length
-            if (
-                currentPos.x < -boundary + playerSize || 
-                currentPos.x > boundary - playerSize || 
-                currentPos.z < -boundary + playerSize || 
-                currentPos.z > boundary - playerSize
-            ) {
-                return true;
-            }
-            
-            // Check multiple points around the player for more accurate collision
-            const checkPoints = [
-                currentPos.clone(),
-                currentPos.clone().add(player.direction.clone().multiplyScalar(playerLength/2)),
-                currentPos.clone().add(player.direction.clone().multiplyScalar(-playerLength/2)),
-                currentPos.clone().add(new THREE.Vector3(playerSize/2, 0, 0)),
-                currentPos.clone().add(new THREE.Vector3(-playerSize/2, 0, 0)),
-                currentPos.clone().add(new THREE.Vector3(0, 0, playerSize/2)),
-                currentPos.clone().add(new THREE.Vector3(0, 0, -playerSize/2))
-            ];
-            
-            // Check each point against tails
-            for (const checkPos of checkPoints) {
-                for (let p = 0; p < players.length; p++) {
-                    const checkPlayer = players[p];
-                    for (let i = 0; i < checkPlayer.tail.length - 3; i++) {
-                        const segment = checkPlayer.tail[i];
-                        const segPos = segment.userData.position;
-                        const segRotation = segment.rotation.y;
-                        
-                        // Convert check position to segment's local space
-                        const localPos = checkPos.clone().sub(segPos);
-                        localPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -segRotation);
-                        
-                        // Increased collision bounds
-                        const segmentWidth = 0.5; // Increased from 0.4 to 0.5
-                        const segmentLength = segment.geometry.parameters.depth;
-                        
-                        // Box collision test with increased size
-                        if (
-                            Math.abs(localPos.x) < (segmentWidth/2 + playerSize/2) &&
-                            Math.abs(localPos.z) < (segmentLength/2 + playerSize/2)
-                        ) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            
-            // Check for potential collisions along movement path with increased precision
-            const nextPos = currentPos.clone().add(player.direction.clone().multiplyScalar(player.speed * 2)); // Look further ahead
-            const pathVector = nextPos.clone().sub(currentPos);
-            const pathLength = pathVector.length();
-            const pathDirection = pathVector.normalize();
-            
-            // Increase number of check points along path
-            const steps = 12; // Increased from 8 to 12 for even more precise collision detection
-            for (let step = 1; step <= steps; step++) {
-                const checkPos = currentPos.clone().add(pathDirection.clone().multiplyScalar(pathLength * step/steps));
-                
-                // Check each point along the path against all tail segments
-                for (let p = 0; p < players.length; p++) {
-                    const checkPlayer = players[p];
-                    for (let i = 0; i < checkPlayer.tail.length - 3; i++) {
-                        const segment = checkPlayer.tail[i];
-                        const segPos = segment.position;
-                        const segRotation = segment.rotation.y;
-                        
-                        const localCheckPos = checkPos.clone().sub(segPos);
-                        localCheckPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), -segRotation);
-                        
-                        // Use same increased collision bounds
-                        if (
-                            Math.abs(localCheckPos.x) < (0.5/2 + playerSize/2) &&
-                            Math.abs(localCheckPos.z) < (segment.geometry.parameters.depth/2 + playerSize/2)
-                        ) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            
-            return false;
-        }
-        
-        // Add after the player setup code, before the animation loop
-        function createExplosion(position, color) {
-            // Create particle geometry
-            const particleCount = 100;
-            const geometry = new THREE.BufferGeometry();
-            const positions = new Float32Array(particleCount * 3);
-            const velocities = [];
-            const scales = [];
 
-            for (let i = 0; i < particleCount; i++) {
-                // Random position within small radius
-                const angle = Math.random() * Math.PI * 2;
-                const radius = Math.random() * 0.5;
-                positions[i * 3] = position.x;
-                positions[i * 3 + 1] = position.y;
-                positions[i * 3 + 2] = position.z;
-
-                // Store velocity for animation
-                velocities.push(
-                    new THREE.Vector3(
-                        (Math.random() - 0.5) * 2,
-                        Math.random() * 2,
-                        (Math.random() - 0.5) * 2
-                    )
-                );
-                scales.push(Math.random() * 0.5 + 0.5);
-            }
-
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-
-            // Create particle material
-            const particleMaterial = new THREE.PointsMaterial({
-                color: color,
-                size: 0.5,
-                transparent: true,
-                blending: THREE.AdditiveBlending,
-                opacity: 1
-            });
-
-            const particles = new THREE.Points(geometry, particleMaterial);
-            scene.add(particles);
-
-            // Create explosion light
-            const light = new THREE.PointLight(color, 5, 10);
-            light.position.copy(position);
-            scene.add(light);
-
-            // Create shockwave
-            const shockwaveGeometry = new THREE.RingGeometry(0, 0.1, 32);
-            const shockwaveMaterial = new THREE.MeshBasicMaterial({
-                color: color,
-                transparent: true,
-                opacity: 0.5,
-                side: THREE.DoubleSide
-            });
-            const shockwave = new THREE.Mesh(shockwaveGeometry, shockwaveMaterial);
-            shockwave.position.copy(position);
-            shockwave.rotation.x = Math.PI / 2;
-            scene.add(shockwave);
-
-            // Animation variables
-            let age = 0;
-            const duration = 1.5;
-            
-            function updateExplosion() {
-                age += 0.016; // Approximate for 60fps
-                const progress = age / duration;
-                
-                if (progress >= 1) {
-                    scene.remove(particles);
-                    scene.remove(light);
-                    scene.remove(shockwave);
-                    return false;
-                }
-
-                // Update particles
-                const positions = particles.geometry.attributes.position.array;
-                for (let i = 0; i < particleCount; i++) {
-                    positions[i * 3] += velocities[i].x * (1 - progress);
-                    positions[i * 3 + 1] += velocities[i].y * (1 - progress);
-                    positions[i * 3 + 2] += velocities[i].z * (1 - progress);
-                    velocities[i].y -= 0.05; // Gravity effect
-                }
-                particles.geometry.attributes.position.needsUpdate = true;
-
-                // Fade out particles
-                particleMaterial.opacity = 1 - progress;
-                particleMaterial.size = scales[0] * (1 - progress) * 2;
-
-                // Update light
-                light.intensity = 5 * (1 - progress);
-
-                // Update shockwave
-                shockwave.scale.set(1 + progress * 8, 1 + progress * 8, 1);
-                shockwaveMaterial.opacity = 0.5 * (1 - progress);
-
-                return true;
-            }
-
-            return updateExplosion;
-        }
-
-        // Add to track active explosions
-        const activeExplosions = [];
-
-        // Modify the gameOver function to add explosion
-        function gameOver(playerIndex) {
-            players[playerIndex].isAlive = false;
-            
-            // Create explosion at player position
-            const explosionUpdate = createExplosion(
-                players[playerIndex].position.clone(),
-                players[playerIndex].color
-            );
-            activeExplosions.push(explosionUpdate);
-
-            // Rest of the gameOver function...
-            const winner = playerIndex === 0 ? "PLAYER 2" : "PLAYER 1";
-            document.getElementById('winnerText').textContent = `${winner} WINS!`;
-            document.getElementById('gameOver').style.display = 'block';
-        }
-        
-        function updateAI(currentTime) {
-            if (!isAIEnabled || !players[1].isAlive) return;
-            
-            // Only update AI decisions periodically
-            if (currentTime - lastAIUpdate < aiUpdateInterval) return;
-            lastAIUpdate = currentTime;
-            
-            const player = players[1];
-            const opponent = players[0];
-            const currentPos = player.position;
-            const direction = player.direction;
-            
-            // Look ahead in multiple directions
-            const lookAheadDistance = 10;
-            const directions = {
-                current: direction.clone(),
-                left: new THREE.Vector3(direction.z, 0, -direction.x),
-                right: new THREE.Vector3(-direction.z, 0, direction.x)
-            };
-            
-            // Score each possible direction
-            const scores = {};
-            for (const [dirName, dir] of Object.entries(directions)) {
-                scores[dirName] = evaluateDirection(player, opponent, currentPos, dir, lookAheadDistance);
-            }
-            
-            // Choose the best direction
-            const bestDirection = Object.entries(scores).reduce((a, b) => b[1] > a[1] ? b : a)[0];
-            
-            if (bestDirection === 'left') {
-                turnLeft(1);
-            } else if (bestDirection === 'right') {
-                turnRight(1);
-            }
-        }
-        
-        function evaluateDirection(player, opponent, currentPos, direction, lookAheadDistance) {
-            let score = 100; // Base score
-            
-            // Check multiple points along the path
-            for (let dist = 1; dist <= lookAheadDistance; dist++) {
-                const checkPos = currentPos.clone().add(direction.clone().multiplyScalar(dist));
-                
-                // Heavy penalty for wall collisions
-                if (
-                    checkPos.x < -boundary || 
-                    checkPos.x > boundary || 
-                    checkPos.z < -boundary || 
-                    checkPos.z > boundary
-                ) {
-                    score -= 1000 / dist; // Penalty reduces with distance
-                    continue;
-                }
-                
-                // Check for tail collisions
-                const tailCollision = checkTailCollision(checkPos, player, opponent);
-                if (tailCollision) {
-                    score -= 800 / dist;
-                    continue;
-                }
-                
-                // Reward for moving into open space
-                score += evaluateOpenSpace(checkPos, player, opponent) / dist;
-                
-                // Reward for moving towards opponent
-                const distToOpponent = checkPos.distanceTo(opponent.position);
-                score += (50 / distToOpponent) / dist;
-                
-                // Reward for moving towards center when near walls
-                const distToCenter = checkPos.length();
-                if (distToCenter > boundary * 0.7) {
-                    score -= distToCenter / dist;
-                }
-            }
-            
-            return score;
-        }
-        
-        function checkTailCollision(pos, player, opponent) {
-            // Check both players' tails
-            for (const p of [player, opponent]) {
-                for (const segment of p.tail) {
-                    const segPos = segment.userData.position;
-                    if (
-                        Math.abs(pos.x - segPos.x) < 1 && 
-                        Math.abs(pos.z - segPos.z) < 1
-                    ) {
-                        return true;
-                    }
-                }
-            }
-            return false;
-        }
-        
-        function evaluateOpenSpace(pos, player, opponent) {
-            let openSpace = 0;
-            const checkRadius = 5;
-            
-            // Check surrounding area for obstacles
-            for (let x = -checkRadius; x <= checkRadius; x++) {
-                for (let z = -checkRadius; z <= checkRadius; z++) {
-                    const checkPos = new THREE.Vector3(pos.x + x, 0, pos.z + z);
-                    
-                    // Skip if outside arena
-                    if (
-                        checkPos.x < -boundary || 
-                        checkPos.x > boundary || 
-                        checkPos.z < -boundary || 
-                        checkPos.z > boundary
-                    ) {
-                        continue;
-                    }
-                    
-                    // If no collision, increment open space
-                    if (!checkTailCollision(checkPos, player, opponent)) {
-                        openSpace++;
-                    }
-                }
-            }
-            
-            return openSpace;
-        }
-        
-        function restartGame() {
-            // Clear all active explosions
-            activeExplosions.length = 0;
-            
-            players.forEach((player, index) => {
-                // Remove old tail
-                player.tail.forEach(segment => scene.remove(segment));
-                player.tail = [];
-                
-                // Reset position and direction
-                player.position.copy(index === 0 ? new THREE.Vector3(-20, 0, 20) : new THREE.Vector3(20, 0, 20));
-                player.direction.copy(new THREE.Vector3(0, 0, -1));
-                player.mesh.position.copy(player.position);
-                player.isAlive = true;
-                updatePlayerRotation(index);
-                player.lastCornerPoint = null;
-                player.distanceSinceLastSegment = 0;
-            });
-            
-            document.getElementById('gameOver').style.display = 'none';
-            
-            // Update AI toggle state
-            const aiToggle = document.getElementById('aiToggle');
-            aiToggle.textContent = `AI: ${isAIEnabled ? 'ON' : 'OFF'}`;
-            aiToggle.classList.toggle('active', isAIEnabled);
-        }
-        
-        // Animation loop
-        function animate(currentTime) {
-            requestAnimationFrame(animate);
-            
-            lastFrameTime = currentTime;
-            updateFPS();
-            updateAI(currentTime);
-            
-            players.forEach((player, index) => {
-                if (player.isAlive) {
-                    player.position.add(player.direction.clone().multiplyScalar(player.speed));
-                    player.mesh.position.copy(player.position);
-                    
-                    // Create tail segments at fixed intervals
-                    player.distanceSinceLastSegment += player.speed;
-                    if (player.distanceSinceLastSegment >= 1.2) { // Increased from 1.0 to create more space between segments
-                        createTailSegment(player.position.clone(), index);
-                        player.distanceSinceLastSegment = 0;
-                    }
-                    
-                    if (checkCollision(index)) {
-                        gameOver(index);
-                    }
-                    
-                    // Update camera target position - position it behind the player
-                    const cameraOffset = player.direction.clone().multiplyScalar(-15); // Distance behind player
-                    cameraOffset.y = 10; // Height of camera
-                    player.cameraTarget.position.copy(player.position).add(cameraOffset);
-                    
-                    // Update camera look-at target - look ahead of the player
-                    const lookAtOffset = player.direction.clone().multiplyScalar(10);
-                    player.cameraTarget.lookAt.copy(player.position).add(lookAtOffset);
-                    
-                    // Smoothly interpolate camera position and lookAt
-                    const lerpFactor = 0.05;
-                    player.camera.position.lerp(player.cameraTarget.position, lerpFactor);
-                    
-                    // Create a temporary vector for the current lookAt
-                    const currentLookAt = new THREE.Vector3();
-                    player.camera.getWorldDirection(currentLookAt);
-                    
-                    // Calculate the target direction
-                    const targetDirection = player.cameraTarget.lookAt.clone().sub(player.camera.position).normalize();
-                    
-                    // Interpolate the direction
-                    const resultDirection = currentLookAt.lerp(targetDirection, lerpFactor);
-                    
-                    // Update camera look-at
-                    player.camera.lookAt(
-                        player.camera.position.clone().add(resultDirection)
-                    );
-                }
-            });
-            
-            // Update explosions
-            for (let i = activeExplosions.length - 1; i >= 0; i--) {
-                const isAlive = activeExplosions[i]();
-                if (!isAlive) {
-                    activeExplosions.splice(i, 1);
-                }
-            }
-            
-            // Calculate viewport dimensions using window dimensions
-            const fullWidth = window.innerWidth;
-            const fullHeight = window.innerHeight;
-            const halfHeight = Math.floor(fullHeight / 2);
-
-            // Top half - Player 2
-            renderer.setViewport(0, halfHeight, fullWidth, halfHeight);
-            renderer.setScissor(0, halfHeight, fullWidth, halfHeight);
-            renderer.setScissorTest(true);
-            players[1].camera.aspect = fullWidth / halfHeight;
-            players[1].camera.updateProjectionMatrix();
-            renderer.render(scene, players[1].camera);
-            
-            // Bottom half - Player 1
-            renderer.setViewport(0, 0, fullWidth, halfHeight);
-            renderer.setScissor(0, 0, fullWidth, halfHeight);
-            renderer.setScissorTest(true);
-            players[0].camera.aspect = fullWidth / halfHeight;
-            players[0].camera.updateProjectionMatrix();
-            renderer.render(scene, players[0].camera);
-        }
-        
-        // Update the resizeRendererToDisplaySize function
-        function resizeRendererToDisplaySize() {
-            const width = window.innerWidth;
-            const height = window.innerHeight;
-            
-            const needsResize = renderer.domElement.width !== width ||
-                               renderer.domElement.height !== height;
-            
-            if (needsResize) {
-                renderer.setSize(width, height, false);
-                renderer.domElement.style.width = '100vw';
-                renderer.domElement.style.height = '100vh';
-                
-                const halfHeight = Math.floor(height / 2);
-                players.forEach(player => {
-                    player.camera.aspect = width / halfHeight;
-                    player.camera.updateProjectionMatrix();
-                });
-            }
-            
-            return needsResize;
-        }
-        
-        window.addEventListener('resize', resizeRendererToDisplaySize);
-        resizeRendererToDisplaySize(); // Call immediately to set correct size
-        
-        // Add this event listener after the other control handlers
-        document.getElementById('aiToggle').addEventListener('click', () => {
-            isAIEnabled = !isAIEnabled;
-            const aiToggle = document.getElementById('aiToggle');
-            aiToggle.textContent = `AI: ${isAIEnabled ? 'ON' : 'OFF'}`;
-            aiToggle.classList.toggle('active', isAIEnabled);
+        coins.forEach(({ mesh, body }) => {
+          mesh.position.copy(body.position);
+          mesh.quaternion.copy(body.quaternion);
         });
-        
-        // Initialize the game
-        animate();
-    </script>
+
+        checkCoinResult();
+        shakeCamera(deltaTime);
+        renderer.render(scene, camera);
+      } catch (error) {
+        console.error('Error in animate loop:', error);
+      }
+    }
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
 </body>
 </html>
