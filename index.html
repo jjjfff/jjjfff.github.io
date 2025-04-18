@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Swipe Coin Flip</title>
+  <title>Emoji Flip</title>
   <style>
     body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
     canvas { display: block; }
@@ -25,11 +25,11 @@
       left: 50%;
       transform: translateX(-50%) scale(0.8); /* Center horizontally, start slightly smaller */
       color: white;
-      font-size: 3.5em; /* Slightly smaller text */
+      font-size: 1.8em; /* Slightly smaller text */
       font-weight: bold;
       text-align: center;
       background: rgba(0, 0, 0, 0.75);
-      padding: 15px 30px; /* Adjusted padding slightly */
+      padding: 15px 50px; /* Increased horizontal padding */
       border-radius: 10px;
       opacity: 0;
       transition: opacity 0.5s ease-out, transform 0.5s ease-out; /* Smooth fade and scale */
@@ -69,7 +69,7 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    //renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -127,6 +127,53 @@
       return texture;
     }
 
+    // Function to create the texture for the central cylinder
+    function createCylinderTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024; // Increased texture resolution
+      canvas.height = 1024; // Increased texture resolution
+      const ctx = canvas.getContext('2d');
+
+      // Background color matching the cylinder
+      ctx.fillStyle = '#d1d8e0'; // Match ground color
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      // Center the drawing
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      // Rotate
+      ctx.rotate(260 * Math.PI / 180); // Set rotation to 110 degrees
+
+      // Text properties
+      ctx.fillStyle = '#000000'; // Black text
+      ctx.font = 'bold 90px Arial, sans-serif'; // Modern font
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const text = "emoji-flip";
+      ctx.fillText(text, 0, 0);
+
+      // Rectangle border
+      ctx.strokeStyle = '#000000'; // Black border
+      ctx.lineWidth = 4; // Line thickness
+      const textMetrics = ctx.measureText(text);
+      const textWidth = textMetrics.width;
+      // Adjust padding for the box
+      const padding = 20;
+      const rectWidth = textWidth + 2 * padding;
+      const rectHeight = 60 + 2 * padding; // Font size + padding
+      ctx.strokeRect(-rectWidth / 2, -rectHeight / 2, rectWidth, rectHeight);
+
+      ctx.restore();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      // Ensure texture repeats correctly around the cylinder
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(1, 1); // Adjust repeat if needed
+
+      return texture;
+    }
+
     const groundMesh = new THREE.Mesh(
       new THREE.PlaneGeometry(500, 500),
       new THREE.MeshStandardMaterial({ 
@@ -149,7 +196,8 @@
     const cylinderMesh = new THREE.Mesh(
       new THREE.CylinderGeometry(2, 2, 0.5, 64),
       new THREE.MeshStandardMaterial({
-        color: '#ff5733',
+        color: '#ff5733', // Revert to original orange-red
+        map: createCylinderTexture(), // Apply the texture here
         metalness: 0.0,
         roughness: 0.5
       })
@@ -179,7 +227,7 @@
     let messageTimeout = null; // To manage message display timing
 
     // Emoji sequence for increasing streak drama
-    const emojiSequence = ['😊', '😄', '😎', '😮', '😲', '🤯'];
+    const emojiSequence = ['🙂', '😊', '😃', '😄', '😁', '😆', '😎', '😮', '😯', '😲', '😳', '🤩', '😵', '🥳', '🤪', '😱', '🤯'];
     const grimaceEmoji = '😬';
 
     function createTextTexture(text) {
@@ -194,7 +242,7 @@
       ctx.font = '800px Arial';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+      ctx.fillText(text, canvas.width / 2, canvas.height / 2 + canvas.height * 0.05);
 
       const colorTexture = new THREE.CanvasTexture(canvas);
 
@@ -206,7 +254,7 @@
       bumpCtx.font = '800px Arial';
       bumpCtx.textAlign = 'center';
       bumpCtx.textBaseline = 'middle';
-      bumpCtx.fillText(text, 512, 512);
+      bumpCtx.fillText(text, 512, 512 + 1024 * 0.05);
 
       const bumpTexture = new THREE.CanvasTexture(bumpCanvas);
       return { colorTexture, bumpTexture };
@@ -253,14 +301,61 @@
           metalness: 0.0,
           roughness: 0.15
         }),
-        new THREE.MeshStandardMaterial({ // Tails face (blank)
-          map: createTextTexture(' ').colorTexture, // Keep tails blank
-          bumpMap: createTextTexture(' ').bumpTexture,
-          bumpScale: -0.05,
+        new THREE.MeshStandardMaterial({ // Tails face (with 'emoji-flip' text)
+          map: createEmojiFlipTexture(), // Use the specific texture for tails
+          // You might want to add bump map for tails too if desired
+          // bumpMap: createEmojiFlipTexture(true), // Example if bump needed
+          // bumpScale: -0.05, 
           metalness: 0.0,
           roughness: 0.15
         })
       ];
+    }
+
+    // Helper function specifically for the 'emoji-flip' tails texture
+    function createEmojiFlipTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      // Background color (match coin face or make transparent if needed)
+      ctx.fillStyle = '#FFFFFF'; // White background like heads
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.save();
+      ctx.translate(canvas.width / 2, canvas.height / 2);
+      // Rotate if needed, adjust as necessary for coin orientation
+       ctx.rotate(180 * Math.PI / 180); 
+
+      // Text properties
+      ctx.fillStyle = '#2d3748'; // Match heads text color
+      ctx.font = 'bold 100px Arial, sans-serif'; // Adjusted font size for coin
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const text = "emoji-flip";
+      ctx.fillText(text, 0, 0);
+
+      // Rectangle border
+      ctx.strokeStyle = '#2d3748'; // Match heads text color
+      ctx.lineWidth = 8; // Adjusted line width for coin
+      const textMetrics = ctx.measureText(text);
+      const textWidth = textMetrics.width;
+      // Adjust padding for the box
+      const padding = 30; // Adjusted padding
+      const rectWidth = textWidth + 2 * padding;
+      const rectHeight = 150 + 2 * padding; // Font size + padding
+      ctx.strokeRect(-rectWidth / 2, -rectHeight / 2, rectWidth, rectHeight);
+
+      ctx.restore();
+
+      const texture = new THREE.CanvasTexture(canvas);
+      texture.wrapS = THREE.ClampToEdgeWrapping; // Clamp instead of repeat for coin face
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      // texture.repeat.set(1, 1); // Not needed for clamp
+
+      return texture;
+      // If bump map is needed, create a similar bump canvas/texture here
     }
 
     // Updates the materials used for the settled coin based on streak
@@ -280,11 +375,6 @@
     // let results = []; // Removed
     let isCoinSettled = true;
     let flipStartTime = 0;
-
-    // Camera shake variables
-    let shakeTime = 0;
-    const shakeDuration = 0.5; // seconds
-    const shakeAmplitude = 1.1; // units
 
     function createCoin(velocityY = 10, velocityZ = 2, velocityX = 0, spin = 50) {
       try {
@@ -384,11 +474,11 @@
             // Check for first time hitting streak of 2
             if (streak === 2 && previousStreak < 2) {
               showTemporaryMessage(streakFlashEl, "Streak of 2!", 2000);
-            } else if (streak > 0) { // Show recap for any ongoing streak
+            } else if (streak > 1) { // Show recap for streaks higher than 2
               // Make recap message more exciting based on streak length
               let recapMessage = `Streak: ${streak}!`;
               if (streak >= 5) recapMessage = `🔥 Streak: ${streak}!! 🔥`;
-              else if (streak >= 3) recapMessage = `✨ Streak: ${streak}! ✨`;
+              else if (streak >= 3) recapMessage = `✨ Streak: ${streak}! ✨`; // Note: this condition is now covered by streak > 2
               showTemporaryMessage(streakRecapEl, recapMessage, 1500);
             }
           } else {
@@ -424,24 +514,6 @@
         // results.push('?'); // Removed
         // document.getElementById('results').textContent = results.join(' '); // Removed
         console.warn('Coin failed to settle, marked as ?');
-      }
-    }
-
-    function shakeCamera(deltaTime) {
-      if (shakeTime < shakeDuration) {
-        shakeTime += deltaTime;
-        const intensity = shakeAmplitude * (1 - shakeTime / shakeDuration); // Damped effect
-        const offsetX = (Math.random() - 0.5) * intensity;
-        const offsetY = (Math.random() - 0.5) * intensity;
-        camera.position.set(
-          originalCameraPosition.x + offsetX,
-          originalCameraPosition.y + offsetY,
-          originalCameraPosition.z
-        );
-        camera.lookAt(0, 0, 1.5);
-      } else {
-        camera.position.copy(originalCameraPosition);
-        camera.lookAt(0, 0, 1.5);
       }
     }
 
@@ -496,21 +568,12 @@
 
         world.step(1 / 120, deltaTime); // Pass deltaTime as second argument
 
-        // Check for ground impact to trigger shake
-        coins.forEach(({ body }) => {
-          if (body.position.y < 0.1 && Math.abs(body.velocity.y) > 1 && shakeTime === 0) {
-            shakeTime = 0; // Start shake
-            console.log('Coin hit ground, shaking camera');
-          }
-        });
-
         coins.forEach(({ mesh, body }) => {
           mesh.position.copy(body.position);
           mesh.quaternion.copy(body.quaternion);
         });
 
         checkCoinResult();
-        shakeCamera(deltaTime);
         renderer.render(scene, camera);
       } catch (error) {
         console.error('Error in animate loop:', error);
