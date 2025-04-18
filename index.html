@@ -10,24 +10,26 @@
     #ui {
       position: absolute;
       top: 10px;
-      left: 10px;
+      left: 50%; /* Center horizontally */
+      transform: translateX(-50%); /* Adjust for element width */
       color: white;
       background: rgba(0, 0, 0, 0.7);
       padding: 10px;
       border-radius: 5px;
       z-index: 10; /* Ensure UI is above messages */
+      text-align: center; /* Center text inside the div */
     }
     .temporary-message {
       position: absolute;
-      top: 50%;
+      bottom: 10%; /* MOVED TO BOTTOM */
       left: 50%;
-      transform: translate(-50%, -50%) scale(0.8); /* Start slightly smaller */
+      transform: translateX(-50%) scale(0.8); /* Center horizontally, start slightly smaller */
       color: white;
-      font-size: 4em; /* Large text */
+      font-size: 3.5em; /* Slightly smaller text */
       font-weight: bold;
       text-align: center;
       background: rgba(0, 0, 0, 0.75);
-      padding: 20px 40px;
+      padding: 15px 30px; /* Adjusted padding slightly */
       border-radius: 10px;
       opacity: 0;
       transition: opacity 0.5s ease-out, transform 0.5s ease-out; /* Smooth fade and scale */
@@ -37,7 +39,7 @@
     }
     .temporary-message.show {
       opacity: 1;
-      transform: translate(-50%, -50%) scale(1); /* Scale to full size */
+      transform: translateX(-50%) scale(1); /* Center horizontally, scale to full size */
     }
   </style>
 </head>
@@ -45,8 +47,6 @@
   <div id="ui">
     <div>Streak: <span id="streak">0</span></div>
     <div>Highest Streak: <span id="highestStreak">0</span></div>
-    <div>Results: <span id="results"></span></div>
-    <div>FPS: <span id="fps">0</span></div>
   </div>
 
   <!-- Temporary Message Elements -->
@@ -277,7 +277,7 @@
     updateStreakMaterials(); // Initialize streakMaterials based on initial streak (0)
 
     const coins = [];
-    let results = [];
+    // let results = []; // Removed
     let isCoinSettled = true;
     let flipStartTime = 0;
 
@@ -404,12 +404,12 @@
           // Apply the updated streak materials to the settled coin
           coin.mesh.material = streakMaterials;
 
-          results.push(displayResult); // Store emoji for results
-          if (results.length > 10) results.shift();
+          // results.push(displayResult); // Removed
+          // if (results.length > 10) results.shift(); // Removed
 
           // Update UI
           document.getElementById('streak').textContent = streak;
-          document.getElementById('results').textContent = results.join(' ');
+          // document.getElementById('results').textContent = results.join(' '); // Removed
 
           isCoinSettled = true;
           console.log(`Coin settled: ${displayResult}, Streak: ${streak}, Highest Streak: ${highestStreak}`);
@@ -421,8 +421,8 @@
       // Fallback: Force settlement if coin takes too long
       if (performance.now() - flipStartTime > 10000) {
         isCoinSettled = true;
-        results.push('?');
-        document.getElementById('results').textContent = results.join(' ');
+        // results.push('?'); // Removed
+        // document.getElementById('results').textContent = results.join(' '); // Removed
         console.warn('Coin failed to settle, marked as ?');
       }
     }
@@ -490,7 +490,6 @@
         frameCount++;
         if (currentTime > lastFpsUpdateTime + 1000) {
           const fps = Math.round(frameCount / ((currentTime - lastFpsUpdateTime) / 1000));
-          document.getElementById('fps').textContent = `FPS: ${fps}`;
           lastFpsUpdateTime = currentTime;
           frameCount = 0;
         }
