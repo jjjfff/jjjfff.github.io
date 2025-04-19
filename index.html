@@ -47,14 +47,9 @@
   <div id="ui">
     <div>Current Streak: <span id="streak">0</span></div>
     <div>Highest Streak: <span id="highestStreak">0</span></div>
-    <div>Current Points: <span id="points">0</span></div>
-    <div>Highest Points: <span id="highestPoints">0</span></div>
   </div>
 
   <!-- Temporary Message Elements -->
-  <div id="streakFlash" class="temporary-message"></div>
-  <div id="streakRecap" class="temporary-message"></div>
-  <div id="streakLostMessage" class="temporary-message"></div>
   <div id="swipePrompt" class="temporary-message">Swipe to flip!</div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r134/three.min.js"></script>
@@ -72,7 +67,6 @@
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.shadowMap.enabled = true;
-    //renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     document.body.appendChild(renderer.domElement);
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
@@ -147,29 +141,9 @@
       // Rotate
       ctx.rotate(270 * Math.PI / 180); // Set rotation to 110 degrees
 
-      // Text properties
-      ctx.fillStyle = '#000000'; // Black text
-      ctx.font = 'bold 120px Arial, sans-serif'; // Modern font
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const text = "emoji-flip";
-      ctx.fillText(text, 0, 0);
-
-      // Rectangle border
-      ctx.strokeStyle = '#000000'; // Black border
-      ctx.lineWidth = 4; // Line thickness
-      const textMetrics = ctx.measureText(text);
-      const textWidth = textMetrics.width;
-      // Adjust padding for the box
-      const padding = 40;
-      const rectWidth = textWidth + 2 * padding;
-      const rectHeight = 60 + 2 * padding; // Font size + padding
-      ctx.strokeRect(-rectWidth / 2, -rectHeight / 2, rectWidth, rectHeight);
-
       ctx.restore();
 
       const texture = new THREE.CanvasTexture(canvas);
-      // Ensure texture repeats correctly around the cylinder
       texture.wrapS = THREE.RepeatWrapping;
       texture.wrapT = THREE.RepeatWrapping;
       texture.repeat.set(1, 1); // Adjust repeat if needed
@@ -197,7 +171,7 @@
     world.addBody(groundBody);
 
     const cylinderMesh = new THREE.Mesh(
-      new THREE.CylinderGeometry(2, 2, 0.5, 64),
+      new THREE.CylinderGeometry(2, 2, 2, 64),
       new THREE.MeshStandardMaterial({
         color: '#ff5733', // Revert to original orange-red
         map: createCylinderTexture(), // Apply the texture here
@@ -210,7 +184,7 @@
     cylinderMesh.receiveShadow = true;
     scene.add(cylinderMesh);
 
-    const cylinderShape = new CANNON.Cylinder(2, 2, 0.5, 64);
+    const cylinderShape = new CANNON.Cylinder(2, 2, 2, 64);
     const cylinderBody = new CANNON.Body({
       mass: 0,
       shape: cylinderShape,
@@ -225,17 +199,15 @@
     let streak = 0;
     let highestStreak = 0;
     let streakMaterials = [];
-    let grimaceMaterials = [];
+    let grimaceMaterials = []; // Fail state (sad face)
+    let flippingMaterials = []; // Flipping state (grimace)
     let previousStreak = 0; // Keep track of the previous streak
     let messageTimeout = null; // To manage message display timing
 
-    // ADDED: Point tracking
-    let points = 0;
-    let highestPoints = 0;
-
     // Emoji sequence for increasing streak drama
     const emojiSequence = ['🙂', '😊', '😃', '😄', '😁', '😆', '😎', '😮', '😯', '😲', '😳', '🤩', '😵', '🥳', '🤪', '😱', '🤯'];
-    const grimaceEmoji = '😬';
+    const grimaceEmoji = '😢'; // Fail state emoji
+    const flippingEmoji = '😬'; // Flipping state emoji
 
     function createTextTexture(text) {
       const canvas = document.createElement('canvas');
@@ -268,21 +240,14 @@
     }
 
     // Get references to message elements
-    const streakFlashEl = document.getElementById('streakFlash');
-    const streakRecapEl = document.getElementById('streakRecap');
-    const streakLostEl = document.getElementById('streakLostMessage');
     const swipePromptEl = document.getElementById('swipePrompt');
+    const streakEl = document.getElementById('streak'); // Added reference for streak display
 
     // Helper function to show temporary messages
     function showTemporaryMessage(element, text, duration = 1500) {
       // Clear any existing message timeout to prevent overlaps ONLY if it's not the initial swipe prompt
-      if (messageTimeout && element !== swipePromptEl) {
-        clearTimeout(messageTimeout);
-        // Immediately hide previous messages if a new one comes quickly
-        streakFlashEl.classList.remove('show');
-        streakRecapEl.classList.remove('show');
-        streakLostEl.classList.remove('show');
-        // Don't hide the swipe prompt here
+      if (messageTimeout && element === swipePromptEl) { 
+         clearTimeout(messageTimeout);
       }
 
       element.textContent = text;
@@ -295,9 +260,9 @@
             messageTimeout = null; // Clear the timeout reference
           }, duration);
       } else {
-          // Set a separate timeout to hide the swipe prompt after a longer duration
-          setTimeout(() => {
+          messageTimeout = setTimeout(() => {
               element.classList.remove('show');
+              messageTimeout = null; 
           }, 2500); // Keep swipe prompt visible for 2.5 seconds
       }
     }
@@ -320,9 +285,6 @@
         }),
         new THREE.MeshStandardMaterial({ // Tails face (with 'emoji-flip' text)
           map: createEmojiFlipTexture(), // Use the specific texture for tails
-          // You might want to add bump map for tails too if desired
-          // bumpMap: createEmojiFlipTexture(true), // Example if bump needed
-          // bumpScale: -0.05, 
           metalness: 0.0,
           roughness: 0.15
         })
@@ -343,53 +305,32 @@
       ctx.save();
       ctx.translate(canvas.width / 2, canvas.height / 2);
       // Rotate if needed, adjust as necessary for coin orientation
-       ctx.rotate(180 * Math.PI / 180); 
-
-      // Text properties
-      ctx.fillStyle = '#2d3748'; // Match heads text color
-      ctx.font = 'bold 100px Arial, sans-serif'; // Adjusted font size for coin
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const text = "emoji-flip";
-      ctx.fillText(text, 0, 0);
-
-      // Rectangle border
-      ctx.strokeStyle = '#2d3748'; // Match heads text color
-      ctx.lineWidth = 8; // Adjusted line width for coin
-      const textMetrics = ctx.measureText(text);
-      const textWidth = textMetrics.width;
-      // Adjust padding for the box
-      const padding = 30; // Adjusted padding
-      const rectWidth = textWidth + 2 * padding;
-      const rectHeight = 150 + 2 * padding; // Font size + padding
-      ctx.strokeRect(-rectWidth / 2, -rectHeight / 2, rectWidth, rectHeight);
+       ctx.rotate(180 * Math.PI / 180);
 
       ctx.restore();
 
       const texture = new THREE.CanvasTexture(canvas);
       texture.wrapS = THREE.ClampToEdgeWrapping; // Clamp instead of repeat for coin face
       texture.wrapT = THREE.ClampToEdgeWrapping;
-      // texture.repeat.set(1, 1); // Not needed for clamp
 
       return texture;
-      // If bump map is needed, create a similar bump canvas/texture here
     }
 
     // Updates the materials used for the settled coin based on streak
     function updateStreakMaterials() {
       // Select emoji based on streak
-      // Change emoji every 3 streaks
-      const emojiIndex = Math.floor(streak / 3);
+      // Change emoji every streak
+      const emojiIndex = streak; // Use streak directly as the index
       const headsText = emojiSequence[Math.min(emojiIndex, emojiSequence.length - 1)];
       streakMaterials = createMaterialsFromText(headsText);
     }
 
     // Initialize materials
     grimaceMaterials = createMaterialsFromText(grimaceEmoji);
+    flippingMaterials = createMaterialsFromText(flippingEmoji);
     updateStreakMaterials(); // Initialize streakMaterials based on initial streak (0)
 
     const coins = [];
-    // let results = []; // Removed
     let isCoinSettled = true;
     let flipStartTime = 0;
 
@@ -402,12 +343,9 @@
         });
         coins.length = 0;
 
-        // No need to update materials here anymore
-        // updateCoinMaterials(); // REMOVED
-
         const mesh = new THREE.Mesh(
           new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32),
-          grimaceMaterials // Use grimace materials initially
+          flippingMaterials // Use flipping materials initially
         );
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -435,12 +373,12 @@
         const coinGroundContact = new CANNON.ContactMaterial(
           groundBody.material,
           body.material,
-          { friction: 0.5, restitution: 0.3 }
+          { friction: 0.001, restitution: 0.003 }
         );
         const coinCylinderContact = new CANNON.ContactMaterial(
           cylinderBody.material,
           body.material,
-          { friction: 0.5, restitution: 0.3 }
+          { friction: 0.001, restitution: 0.003 }
         );
         world.addContactMaterial(coinGroundContact);
         world.addContactMaterial(coinCylinderContact);
@@ -464,6 +402,7 @@
 
       // Check if coin has settled
       if (
+        !isCoinSettled && // Only check if not already marked as settled
         Math.abs(velocity.x) < 0.1 &&
         Math.abs(velocity.y) < 0.1 &&
         Math.abs(velocity.z) < 0.1 &&
@@ -471,96 +410,107 @@
         Math.abs(angularVelocity.y) < 0.1 &&
         Math.abs(angularVelocity.z) < 0.1
       ) {
+        isCoinSettled = true; // Mark as settled immediately to prevent re-triggering
+        console.log('Coin settled, checking result...');
+
         try {
           // Get the up vector of the coin in world coordinates
           const up = new THREE.Vector3(0, 1, 0); // Local up for heads
           const worldUp = up.applyQuaternion(coin.mesh.quaternion);
-
-          // Check if coin is heads
           const dot = worldUp.dot(new THREE.Vector3(0, 1, 0));
           const result = dot > 0 ? 'H' : 'T';
-          const displayResult = dot > 0 ? '😊' : '❌'; // Use emojis for display
+          const displayResult = dot > 0 ? '😊' : '❌'; // Initial display guess
 
           // Check coin contacts
           let isTouchingCylinder = false;
           let isTouchingGround = false;
-          for (const contact of world.contacts) {
-              if ((contact.bi === coin.body && contact.bj === cylinderBody) ||
-                  (contact.bi === cylinderBody && contact.bj === coin.body)) {
+          world.contacts.forEach(contact => {
+              const bodyA = contact.bi;
+              const bodyB = contact.bj;
+              if ((bodyA === coin.body && bodyB === cylinderBody) || (bodyA === cylinderBody && bodyB === coin.body)) {
                   isTouchingCylinder = true;
               }
-              if ((contact.bi === coin.body && contact.bj === groundBody) ||
-                  (contact.bi === groundBody && contact.bj === coin.body)) {
+              if ((bodyA === coin.body && bodyB === groundBody) || (bodyA === groundBody && bodyB === coin.body)) {
                   isTouchingGround = true;
               }
-              // Optimization: If both are true, no need to check further
-              if (isTouchingCylinder && isTouchingGround) {
-                  break;
+          });
+          console.log(`Contacts: Cylinder=${isTouchingCylinder}, Ground=${isTouchingGround}`);
+
+          // --- DELAYED RESULT PROCESSING ---
+          setTimeout(() => {
+              // Double check if the coin still exists in the scene
+              if (!coin.mesh || !scene.getObjectById(coin.mesh.id)) {
+                  console.log("Coin removed before result processing timeout.");
+                  return;
               }
-          }
 
-          // Update streak BEFORE updating materials
-          if (result === 'H') {
-            streak++;
-            if (streak > highestStreak) {
-              highestStreak = streak;
-              document.getElementById('highestStreak').textContent = highestStreak;
-            }
-            // Check for first time hitting streak of 2
-            if (streak === 2 && previousStreak < 2) {
-              showTemporaryMessage(streakFlashEl, "Streak of 2!", 2000);
-            } else if (streak > 1) { // Show recap for streaks higher than 2
-              // Make recap message more exciting based on streak length
-              let recapMessage = `Streak: ${streak}!`;
-              if (streak >= 5) recapMessage = `🔥 Streak: ${streak}!! 🔥`;
-              else if (streak >= 3) recapMessage = `✨ Streak: ${streak}! ✨`; // Note: this condition is now covered by streak > 2
-              showTemporaryMessage(streakRecapEl, recapMessage, 1500);
-            }
+              let finalDisplayResult = displayResult; // For logging
+              let streakUpdated = false; // Flag to track if streak UI needs update
 
-            // Update points ONLY if heads AND touching cylinder AND NOT touching ground
-            if (isTouchingCylinder && !isTouchingGround) {
-                points++;
-                if (points > highestPoints) {
-                    highestPoints = points;
-                    document.getElementById('highestPoints').textContent = highestPoints;
+              if (result === 'H') {
+                // SUCCESSFUL HEADS: On cylinder, not on ground
+                if (isTouchingCylinder && !isTouchingGround) {
+                  previousStreak = streak; // Capture streak *before* incrementing
+                  streak++;
+                  streakUpdated = true;
+                  if (streak > highestStreak) {
+                    highestStreak = streak;
+                    document.getElementById('highestStreak').textContent = highestStreak;
+                  }
+
+                  // Update materials for the successful streak
+                  updateStreakMaterials();
+                  coin.mesh.material = streakMaterials;
+                  finalDisplayResult = `😊 (Streak ${streak})`; // Update log message
+
+                } else {
+                  // FAILED HEADS: On ground or touching both
+                  if (streak > 0) streakUpdated = true; // Need to update UI if streak was > 0
+                  streak = 0;
+                  // Apply grimace material for missed heads
+                  coin.mesh.material = grimaceMaterials;
+                  finalDisplayResult = `😢 (Heads on Ground)`; // Update log message
                 }
-            }
+              } else {
+                // TAILS
+                if (streak > 0) streakUpdated = true; // Need to update UI if streak was > 0
+                streak = 0;
+                // Apply grimace material for tails
+                coin.mesh.material = grimaceMaterials;
+                finalDisplayResult = `😢 (Tails)`; // Update log message
+              }
 
-          } else {
-            // Check if a streak was active before this flip
-            if (streak > 0) {
-              showTemporaryMessage(streakLostEl, "Streak Lost!", 2000);
-            }
-            streak = 0;
-            points = 0; // Reset points on tails
-          }
+              // Update UI text after processing result
+              if (streakUpdated) {
+                  if (streak === 0) {
+                      streakEl.innerHTML = '❌';
+                  } else if (streak <= 3) {
+                      streakEl.innerHTML = '✅'.repeat(streak);
+                  } else {
+                      streakEl.innerHTML = `🔥 ${streak}`;
+                  }
+              } else if (streak === 0) { // Ensure initial state or no change state is handled
+                  streakEl.innerHTML = '0'; // Or '❌' if preferred for initial state too?
+              }
 
-          // Update streak materials based on the new streak
-          updateStreakMaterials();
-          // Apply the updated streak materials to the settled coin
-          coin.mesh.material = streakMaterials;
+              console.log(`Processed result: ${finalDisplayResult}, Streak: ${streak}, Highest Streak: ${highestStreak}`);
 
-          // results.push(displayResult); // Removed
-          // if (results.length > 10) results.shift(); // Removed
+          }, 500); // 500ms delay (was 1 second before)
 
-          // Update UI
-          document.getElementById('streak').textContent = streak;
-          document.getElementById('points').textContent = points; // Update points display
-          // document.getElementById('results').textContent = results.join(' '); // Removed
-
-          isCoinSettled = true;
-          console.log(`Coin settled: ${displayResult}, Streak: ${streak}, Highest Streak: ${highestStreak}`);
         } catch (error) {
           console.error('Error checking coin result:', error);
+          // Ensure coin is marked settled even if error occurs during check
+          // isCoinSettled was already set true before the try block
         }
       }
 
       // Fallback: Force settlement if coin takes too long
-      if (performance.now() - flipStartTime > 10000) {
-        isCoinSettled = true;
-        // results.push('?'); // Removed
-        // document.getElementById('results').textContent = results.join(' '); // Removed
-        console.warn('Coin failed to settle, marked as ?');
+      if (!isCoinSettled && performance.now() - flipStartTime > 11000) { 
+        console.warn('Coin failed to settle physically, forcing settlement state.');
+        isCoinSettled = true; 
+        if (coin.mesh && scene.getObjectById(coin.mesh.id)){
+            coin.mesh.material = grimaceMaterials;
+        }
       }
     }
 
