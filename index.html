@@ -796,9 +796,18 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
       uPrevViewProj: { value: new THREE.Matrix4() }, uCamPos: U.uCamPos, uInvView: U.uInvView, uInvProj: U.uInvProj,
       uBlend: { value: 0.9 }, uTexel: { value: new THREE.Vector2() }, uReset: { value: 1 },
       uChecker: U.uChecker, uCbOffset: U.uCbOffset, uAdvect: { value: new THREE.Vector3() }, uFreshBlend: { value: 0.92 }, uLightChange: U.uLightChange,
+      uHistDepth: { value: null },
     },
     fragmentShader: pre + window.CATMULL_GLSL + /* glsl */`
-      in vec2 vUv; out vec4 o;
+      in vec2 vUv;
+      layout(location = 0) out vec4 o;
+      // The cloud distance, averaged over frames like the colour (for the composite's haze): r = the
+      // fraction of samples that hit cloud, g = that × distance / 100 km. (The haze used to take each
+      // frame's own distance: coarse and jittered, it made the haze over far clouds flicker, the
+      // horizon shimmering in blocks at low resolution.)
+      layout(location = 1) out vec4 oh;
+      uniform sampler2D uHistDepth;
+      vec4 hitOf(float depth){ return depth < 5e3 ? vec4(1.0, min(depth, 100.0)/100.0, 0.0, 1.0) : vec4(0.0, 0.0, 0.0, 1.0); }
       uniform sampler2D uCurrent, uCurDepth, uHistory;
       uniform mat4 uPrevViewProj, uInvView, uInvProj; uniform vec3 uCamPos;
       uniform float uBlend, uReset; uniform vec2 uTexel;
@@ -832,23 +841,32 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
         }
         m1 /= 9.0; vec4 sd = sqrt(max(m2/9.0 - m1*m1, 0.0));
         vec4 cur = fresh ? texelFetch(uCurrent, j, 0) : est;
-        if (uReset > 0.5) { o = cur; return; }
         float depth = texelFetch(uCurDepth, j, 0).r;
         #ifdef LDR
         depth = depth > 0.995 ? 1e4 : depth*100.0;
         #endif
+        vec4 hc = hitOf(depth);
+        if (uReset > 0.5) { o = cur; oh = hc; return; }
         vec2 puv = reproject(depth);
-        if (any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = cur; return; }
+        if (any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = cur; oh = hc; return; }
         float motion = max(smoothstep(0.1, 1.0, length((puv - vUv)*vec2(textureSize(uHistory, 0)))), uLightChange);
         vec4 raw = textureCR(uHistory, puv);
         raw = vec4(max(raw.rgb, 0.0), clamp(raw.a, 0.0, 1.0));   // bicubic overshoot: keep transmittance in 0…1
         vec4 hist = mix(raw, clamp(raw, max(mn, m1 - 1.5*sd), min(mx, m1 + 1.5*sd)), motion);
-        o = fresh ? mix(cur, hist, min(uFreshBlend, mix(0.92, 0.85, motion))) : mix(hist, est, motion*0.5);   // moving: lean on the smooth estimate (reads as motion blur, not stair-steps)
+        float keep = min(uFreshBlend, mix(0.92, 0.85, motion));
+        o = fresh ? mix(cur, hist, keep) : mix(hist, est, motion*0.5);   // moving: lean on the smooth estimate (reads as motion blur, not stair-steps)
+        vec4 hh = texture(uHistDepth, puv);
+        oh = fresh ? mix(hc, hh, keep) : mix(hh, hc, motion*0.5);
       }
       void main(){
         if (uChecker == 1) { checker(); return; }
         vec4 cur = texture(uCurrent, vUv);
-        if (uReset > 0.5) { o = cur; return; }
+        float d0 = texture(uCurDepth, vUv).r;
+        #ifdef LDR
+        d0 = d0 > 0.995 ? 1e4 : d0*100.0;
+        #endif
+        vec4 hc = hitOf(d0);
+        if (uReset > 0.5) { o = cur; oh = hc; return; }
         // neighbourhood min/max of the current frame (3×3) to reject stale history
         vec4 mn = cur, mx = cur;
         for (int y=-1;y<=1;y++) for (int x=-1;x<=1;x++){
@@ -865,9 +883,10 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
         vec4 wp = depth > 5e3 ? vec4(rd, 0.0) : vec4(uCamPos + rd*depth + uAdvect*float(uChecker), 1.0);
         vec4 pc = uPrevViewProj * wp;
         vec2 puv = pc.xy/pc.w*0.5+0.5;
-        if (pc.w <= 0.0 || any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = cur; return; }
+        if (pc.w <= 0.0 || any(lessThan(puv, vec2(0.0))) || any(greaterThan(puv, vec2(1.0)))) { o = cur; oh = hc; return; }
         vec4 hist = clamp(texture(uHistory, puv), mn, mx);
         o = mix(cur, hist, uBlend);
+        oh = mix(hc, texture(uHistDepth, puv), uBlend);
       }`,
   });
 
@@ -919,7 +938,7 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
     // resolution changes (auto-resolution, the panel's sliders) don't restart the accumulation.
     carry?.dispose(); carry = resized ? hist[ping] : null;
     hist[1 - ping]?.dispose();
-    hist = [new THREE.WebGLRenderTarget(w, h, rtOpts), new THREE.WebGLRenderTarget(w, h, rtOpts)];
+    hist = [0, 1].map(() => new THREE.WebGLRenderTarget(w, h, Object.assign({ count: 2 }, rtOpts)));   // colour, averaged cloud distance
     // (a carried history is still good, just resampled: the blend carries on as before. Restarting
     // its running mean here let the first new samples replace it, and every auto-resolution step
     // made the clouds' fine detail churn with checkerboard speckle for a second.)
@@ -960,7 +979,8 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
       prof?.end();
       const tu = temporalMat.uniforms;
       tu.uCurrent.value = cloudRT.textures[0]; tu.uCurDepth.value = cloudRT.textures[1];
-      tu.uHistory.value = (carry || hist[ping]).texture; tu.uTexel.value.set(1 / cloudRT.width, 1 / cloudRT.height);
+      tu.uHistory.value = (carry || hist[ping]).textures[0]; tu.uHistDepth.value = (carry || hist[ping]).textures[1];
+      tu.uTexel.value.set(1 / cloudRT.width, 1 / cloudRT.height);
       tu.uPrevViewProj.value.copy(prevViewProj);
       // the clouds drift with the wind: a feature seen at p now was at p + wind·Δt last frame
       tu.uAdvect.value.copy(U.uWind.value).multiplyScalar(U.uTime.value - prevTime); prevTime = U.uTime.value;
@@ -978,7 +998,8 @@ window.makeClouds = function (THREE, renderer, noise, weather, atmo, prof) {
       viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       prevViewProj.copy(viewProj);
       renderer.setRenderTarget(prev);
-      return { color: hist[ping].texture, raw: cloudRT.textures[0], depth: cloudRT.textures[1] };
+      // depth: this frame's (r = distance, km); haze: averaged over frames (r = hit fraction, g = r × km / 100)
+      return { color: hist[ping].textures[0], raw: cloudRT.textures[0], depth: cloudRT.textures[1], haze: hist[ping].textures[1] };
     },
     // Distance (km) to the cloud seen at uv ∈ [0,1]² in the last cloud pass, read from the
     // depth attachment. Only in the 8-bit (LDR) mode, where that buffer is readable on any
@@ -1092,7 +1113,7 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
   const mat = new THREE.RawShaderMaterial({
     glslVersion: THREE.GLSL3, vertexShader: vert, depthTest: false, depthWrite: false,
     uniforms: Object.assign({}, U, {
-      uCloudTex: { value: null }, uCloudDepth: { value: null }, uShafts: { value: null },
+      uCloudTex: { value: null }, uCloudDepth: { value: null }, uCloudHaze: { value: null }, uShafts: { value: null },
       uExposure: { value: 1 }, uHaze: { value: 1 }, uGodRays: { value: 0.6 }, uShaftsOn: { value: 0 },
       uResolution: { value: new THREE.Vector2() }, uSlice: { value: 0 }, uDim: { value: 0 }, uXray: { value: 0 },
       uSurface: { value: 0 }, uViewProj: { value: new THREE.Matrix4() }, uFov: { value: 60 },
@@ -1110,7 +1131,7 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
     }),
     fragmentShader: pre + window.ATMOS_GLSL + window.CLOUD_GLSL + window.CATMULL_GLSL + SHADOW_GLSL + /* glsl */`
       in vec2 vUv; out vec4 o;
-      uniform sampler2D uCloudTex, uCloudDepth, uShafts;
+      uniform sampler2D uCloudTex, uCloudDepth, uCloudHaze, uShafts;
       uniform vec3 uCamPos; uniform mat4 uInvView, uInvProj; uniform int uDebugView;
       uniform float uExposure, uHaze, uGodRays, uShaftsOn, uSlice, uDim, uXray; uniform vec2 uResolution;
       uniform int uSurface; uniform mat4 uViewProj; uniform float uFov;
@@ -1360,11 +1381,13 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
         vec3 col;
         if (cl.a < 0.999) {
           vec3 Tap;
-          // distance for the haze: this frame's cloud depth, or, where this frame's ray missed (thin
-          // edges, the far horizon: the colour is accumulated over many frames but the depth is
-          // this frame's), where the ray enters the cloud layer. (It used to take 30 km: edge
-          // pixels flashed hazy-bright in speckles, and the horizon flickered.)
-          float dist = dd.r;
+          // distance for the haze: the cloud distance averaged over frames like the colour (clouds.js),
+          // or, where no frame's ray has hit cloud lately (thin edges, the far horizon), where the ray
+          // enters the cloud layer. (It used to take 30 km there: edge pixels flashed hazy-bright in
+          // speckles, and the horizon flickered. Then each frame's own distance: coarse and jittered,
+          // the haze over far clouds shimmered in blocks.)
+          vec4 hz = texture(uCloudHaze, vUv);
+          float dist = hz.r > 0.02 ? hz.g*100.0/hz.r : 1e4;
           if (dist > 5e3) { float s0, s1; dist = cloudSegment(ro, rd, s0, s1) ? s0 + 0.25*(s1 - s0) : 30.0; }
           vec3 cAlt = ro + rd*dist;
           // aerial perspective on premultiplied cloud light: L·Tap + sky·(1−Tap)·opacity. (It used to
@@ -1421,7 +1444,7 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
     render(camera, cloudOut, width, height, target = null) {
       mat.uniforms.uPostOut.value = target ? 1 : 0;
       const u = mat.uniforms;
-      u.uCloudTex.value = u.uDebugView.value === 5 ? cloudOut.raw : cloudOut.color; u.uCloudDepth.value = cloudOut.depth;
+      u.uCloudTex.value = u.uDebugView.value === 5 ? cloudOut.raw : cloudOut.color; u.uCloudDepth.value = cloudOut.depth; u.uCloudHaze.value = cloudOut.haze;
       u.uResolution.value.set(width, height); u.uFov.value = camera.fov;
       u.uViewProj.value.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
       // shafts only when the sun is in front of the camera
