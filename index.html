@@ -1106,7 +1106,7 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
       // FFT ocean (ocean.js): uOceanModel 1 = its cascades, 0 = the analytic waves below
       uOceanModel: { value: 0 }, uOcean0: { value: null }, uOcean1: { value: null }, uOcean2: { value: null },
       uOceanL: { value: new THREE.Vector3(1000, 130, 20) }, uSeaRough: { value: 0.01 },
-      uSeaColor: { value: new THREE.Vector3(0.004, 0.022, 0.03) }, uSeaSSS: { value: new THREE.Vector3(0.02, 0.07, 0.06) }, uFoamAmt: { value: 1 },
+      uSeaColor: { value: new THREE.Vector3(0.004, 0.022, 0.03) }, uSeaSSS: { value: new THREE.Vector3(0.02, 0.07, 0.06) },
     }),
     fragmentShader: pre + window.ATMOS_GLSL + window.CLOUD_GLSL + window.CATMULL_GLSL + SHADOW_GLSL + /* glsl */`
       in vec2 vUv; out vec4 o;
@@ -1116,10 +1116,10 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
       uniform int uSurface; uniform mat4 uViewProj; uniform float uFov;
       uniform float uMoonMode, uNight, uMoonSize, uMoonGlow; uniform vec3 uRealSun; uniform mat3 uEqToHor;
       uniform sampler2D uShadowMap; uniform float uShadowMapOn, uShadowRange, uCloudBicubic, uPostOut;
-      uniform sampler2D uOcean0, uOcean1, uOcean2; uniform vec3 uOceanL, uSeaColor, uSeaSSS; uniform float uOceanModel, uSeaRough, uFoamAmt;
+      uniform sampler2D uOcean0, uOcean1, uOcean2; uniform vec3 uOceanL, uSeaColor, uSeaSSS; uniform float uOceanModel, uSeaRough;
       // FFT ocean: three cascades of slopes (mipmapped: far away they average into roughness),
       // Fresnel reflection of sky and clouds, sun/moon glitter from a Beckmann microfacet lobe
-      // whose width is the slope variance, light through wave crests, breaking-wave foam.
+      // whose width is the slope variance, light through wave crests.
       // reflections looked up in the cloud buffer: 1 on the screen, fading to 0 a band beyond its edges
       float edgeFade(vec2 uv){ vec2 m = min(uv, 1.0 - uv); return smoothstep(-0.2, 0.02, min(m.x, m.y)); }
       vec3 fftSea(vec3 p, vec3 rd, vec3 up, vec3 Lsun, float shadow, float camAlt){
@@ -1173,14 +1173,6 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
         float crest = clamp(dot(s, hv.xz)*3.0, 0.0, 1.0);     // wave faces turned toward us
         body += uSeaSSS*Lsun*shadow*toward*crest*max(uSunDir.y + 0.1, 0.0);
         vec3 col = body*(1.0 - F) + refl*F + glint;
-        // foam: breaking crests, streaked by a little noise; lit like a white diffuse surface
-        float foam = clamp(a.w*0.5 + b.w + c.w*0.6, 0.0, 1.5)*uFoamAmt;
-        if (foam > 0.001) {
-          // bubbly, streaky texture with crisp edges: two noise scales stretched along the wind-ish x
-          float n1 = texture(uShape, vec3(xz*vec2(0.09, 0.22), 0.31)).g, n2 = texture(uDetail, vec3(xz*0.6, 0.57)).r;
-          float cover = smoothstep(0.35, 0.75, foam*(0.55 + 0.6*n1) + 0.25*n2 - 0.1);
-          col = mix(col, vec3(0.8)/PI*(Esun + Esky), cover*0.9);
-        }
         return col;
       }
       float groundShadow(vec3 p){
@@ -1478,12 +1470,13 @@ window.makeComposite = function (THREE, renderer, clouds, prof) {
 //   cascade 1:  130 m tile  — wind waves                         (0.3 … 2.2)
 //   cascade 2:   20 m tile  — short waves and ripples           (2.2 … 20, λ ≥ 0.3 m)
 // The cascades' tile sizes aren't multiples of each other, so no repetition shows.
-// Per cascade, the composite gets a mipmapped texture (slope x, slope z, mean squared slope,
-// foam). Mipmaps average the slopes over a pixel's footprint, so the distant sea turns
+// Per cascade, the composite gets a mipmapped texture (slope x, slope z, mean squared slope).
+// (There was foam on breaking crests, in the 4th channel: removed, it was the weakest part of the
+// picture.) Mipmaps average the slopes over a pixel's footprint, so the distant sea turns
 // statistically rough instead of aliasing (the sun's glitter path widens with distance, like
 // the real one); waves shorter than the last cascade go into a Cox–Munk roughness term.
 // Choppy waves: crests sharpen where the horizontal displacement compresses the surface
-// (Jacobian); where it folds over (J < threshold) the wave breaks and leaves foam that fades.
+// (Jacobian).
 //
 // Needs float or half-float render targets (not in the 8-bit LDR mode: the composite then keeps
 // its analytic waves).
@@ -1608,26 +1601,18 @@ window.makeOcean = function (THREE, renderer, prof, opts = {}) {
       o = vec4(e.xy + cmul(w, od.xy), e.zw + cmul(w, od.zw));
     }`, { uSrc: { value: null }, uSub: { value: 2 }, uHoriz: { value: 1 } });
 
-  // ---- 4. combine: choppy slopes, mean squared slope (for the mipmapped roughness), foam
+  // ---- 4. combine: choppy slopes, mean squared slope (for the mipmapped roughness)
   const combineMat = mat(/* glsl */`
-    uniform sampler2D uFFT, uPrev0, uPrev1, uPrev2;
-    uniform float uChop, uFoamDecay; uniform vec3 uFoamBias, uFoamWidth;
+    uniform sampler2D uFFT;
+    uniform float uChop;
     layout(location = 0) out vec4 o0; layout(location = 1) out vec4 o1; layout(location = 2) out vec4 o2;
-    vec4 cascade(int c, float prev, float bias, float width){
+    vec4 cascade(int c){
       vec4 f = texelFetch(uFFT, ivec2(gl_FragCoord.xy) + ivec2(0, c*N), 0);
       float jx = 1.0 + uChop*f.z, jz = 1.0 + uChop*f.w;
       vec2 s = f.xy/max(vec2(jx, jz), 0.3);       // crests steepen where the surface is compressed
-      float J = jx*jz;                             // < 1: compressed; < ~0.3: breaking
-      float fresh = clamp((bias - J)/width, 0.0, 1.0);
-      return vec4(s, dot(s, s), max(prev*uFoamDecay, fresh));
+      return vec4(s, dot(s, s), 0.0);
     }
-    void main(){
-      ivec2 p = ivec2(gl_FragCoord.xy);
-      o0 = cascade(0, texelFetch(uPrev0, p, 0).a, uFoamBias.x, uFoamWidth.x);
-      o1 = cascade(1, texelFetch(uPrev1, p, 0).a, uFoamBias.y, uFoamWidth.y);
-      o2 = cascade(2, texelFetch(uPrev2, p, 0).a, uFoamBias.z, uFoamWidth.z);
-    }`, { uFFT: { value: null }, uPrev0: { value: null }, uPrev1: { value: null }, uPrev2: { value: null },
-    uChop: { value: 1 }, uFoamDecay: { value: 0.98 }, uFoamBias: { value: new THREE.Vector3(-9, -9, -9) }, uFoamWidth: { value: new THREE.Vector3(1, 1, 1) } });
+    void main(){ o0 = cascade(0); o1 = cascade(1); o2 = cascade(2); }`, { uFFT: { value: null }, uChop: { value: 1 } });
 
   const scene = new THREE.Scene(), quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), h0Mat); scene.add(quad);
   quad.frustumCulled = false;
@@ -1653,23 +1638,8 @@ window.makeOcean = function (THREE, renderer, prof, opts = {}) {
     const mss = w => (w ** 4) / (G * G);
     const resolved = integrate(w => mss(w) * (wind[0] * shape(w, wp, gam) + swell[0] * shape(w, swp, 5)), 0.05, wMax);
     const cm = 0.003 + 0.00512 * U;                                  // Cox–Munk, clean sea
-    // Foam. J − 1 ≈ λ·(∂Dx/∂x + ∂Dz/∂z) = λ·Σ k·h is near-Gaussian with variance λ²·(the band's
-    // mean squared slope), so each cascade's threshold can be set for a chosen breaking
-    // fraction: whitecap coverage after Monahan & O'Muircheartaigh (1980), 3.84e-6·U^3.41,
-    // shared out between the cascades (the foam then lingers ~3 s, as trails)
-    const lam = sea.chop ?? 1;
-    const W = Math.min(0.25, 3.84e-6 * Math.pow(U, 3.41) * amp2) * (sea.foam ?? 1);   // bigger waves at the same wind: steeper, more breaking
-    const bandW = KB.map(k => Math.sqrt(G * k));
-    const foam = [0, 1, 2].map(c => {
-      const m = integrate(w => mss(w) * (wind[0] * shape(w, wp, gam) + swell[0] * shape(w, swp, 5)), Math.max(0.05, bandW[c]), bandW[c + 1], 600);
-      const sd = lam * Math.sqrt(m), f = W * [0.12, 0.7, 0.35][c];   // whitecaps are metres across: mostly cascade 1
-      if (f < 1e-5 || sd < 1e-4) return [-9, 1];
-      const tt = Math.sqrt(-2 * Math.log(f));                          // inverse normal tail (Abramowitz–Stegun 26.2.23)
-      const z = tt - (2.515517 + 0.802853 * tt + 0.010328 * tt * tt) / (1 + 1.432788 * tt + 0.189269 * tt * tt + 0.001308 * tt ** 3);
-      return [1 - z * sd, Math.max(1e-3, 0.6 * sd)];
-    });
     const hs = 4 * Math.sqrt(integrate(w => wind[0] * shape(w, wp, gam), 0.05, 40) + m0s * amp2);
-    return { wind, swell, rough: Math.min(0.12, Math.max(0.002, cm - resolved)), hs, wp, foam, whitecaps: W };
+    return { wind, swell, rough: Math.min(0.12, Math.max(0.002, cm - resolved)), hs, wp };
   }
   const toRad = deg => { const a = deg * Math.PI / 180; return Math.atan2(-Math.cos(a), Math.sin(a)); };   // compass → angle in (x, z)
 
@@ -1679,8 +1649,7 @@ window.makeOcean = function (THREE, renderer, prof, opts = {}) {
     const sp = spectrumParams(sea);
     U.uWind.value.set(...sp.wind); U.uSwell.value.set(...sp.swell);
     U.uDir.value.set(toRad(sea.dir), toRad(sea.swellDir ?? sea.dir));
-    info = { hs: sp.hs, rough: sp.rough, peakWavelength: 2 * Math.PI * G / sp.wp ** 2, whitecaps: sp.whitecaps };
-    CU.uFoamBias.value.set(...sp.foam.map(f => f[0])); CU.uFoamWidth.value.set(...sp.foam.map(f => f[1]));
+    info = { hs: sp.hs, rough: sp.rough, peakWavelength: 2 * Math.PI * G / sp.wp ** 2 };
     const prev = renderer.getRenderTarget();
     run(h0Mat, h0RT);
     renderer.setRenderTarget(prev);
@@ -1715,9 +1684,7 @@ window.makeOcean = function (THREE, renderer, prof, opts = {}) {
       }
       const last = outs[ping], next = outs[1 - ping];
       CU.uFFT.value = src.texture; lastFFT = src;
-      CU.uPrev0.value = last.textures[0]; CU.uPrev1.value = last.textures[1]; CU.uPrev2.value = last.textures[2];
       CU.uChop.value = sea.chop ?? 1;
-      CU.uFoamDecay.value = Math.exp(-dt / 3);        // foam lingers a few seconds
       run(combineMat, next);
       ping = 1 - ping;
       renderer.setRenderTarget(prev);
@@ -2801,14 +2768,13 @@ const api = {
     setPlanet(p) { atmo.setPlanet(p); clouds.resetHistory(); },
     get planet() { return atmo.planetParams; },
     // sea state for the FFT ocean (ocean.js setSea) plus the water's colours:
-    // { wind, dir, fetch, swellH, swellT, swellDir, chop, foam, spread, color: [r,g,b], sss: [r,g,b] }
+    // { wind, dir, fetch, swellH, swellT, swellDir, chop, spread, color: [r,g,b], sss: [r,g,b] }
     ocean,
     setSea(s) {
       if (!ocean || !s) return;
       ocean.setSea(s);
       if (s.color) CU.uSeaColor.value.set(...s.color);
       if (s.sss) CU.uSeaSSS.value.set(...s.sss);
-      CU.uFoamAmt.value = s.foamShow ?? 1;
     },
     updateCamera: () => updateCamera(camera, canvas.width, canvas.height),
     camera,
@@ -3281,10 +3247,12 @@ window.Director = (api, opts = {}) => {
   const api = window.__api;
   if (!api) { console.error('renderer did not start'); return; }
   const s = WP.settings;
+  // flight speed, km/h: flying at 1000 by default (a saved 0 stays stopped)
+  const flyDefault = t => t.flySpeed != null && t.flySpeed !== '' ? Math.max(0, +t.flySpeed || 0) : 1000;
   const loc = Number.isFinite(+s.lat) && s.lat !== undefined && s.lat !== null && s.lat !== ''
     ? { lat: +s.lat, lon: +s.lon, source: s.locSource || 'saved' } : A.guessLocation();
   const D = window.Director(api, { location: loc, cloudSpeed: +s.cloudSpeed || 3, height: s.height ?? null, tilt: +s.tilt || 0, turn: +s.turn || 0, parallax: WP.mode === 'wallpaper' ? +s.parallax || 0 : 0,
-    waveSize: s.waveSize ?? 1, seaStorm: s.seaStorm ?? null, flySpeed: +s.flySpeed || 0 });
+    waveSize: s.waveSize ?? 1, seaStorm: s.seaStorm ?? null, flySpeed: flyDefault(s) });
   const q = new URLSearchParams(location.search);
   if (q.has('t')) D.setClock(new Date(q.get('t')), q.has('rate') ? +q.get('rate') : 1);
   else if (q.has('rate')) D.setClock(new Date(), +q.get('rate'));
@@ -3328,7 +3296,7 @@ window.Director = (api, opts = {}) => {
       <label title="The 📊 button (top right): frame rate, GPU timings, benchmark"><input type="checkbox" id="w-perfbtn"> Performance stats icon</label>
       <label title="A button (top left) that copies a debug report: everything that makes this shot, the flight path, and a code to rebuild it exactly"><input type="checkbox" id="w-debug"> Debug button</label>
       ${WP.mode === 'app' ? `<label>Wallpaper changes <select id="w-cycle">${[[0, 'never'], [10, 'every 10 s'], [30, 'every 30 s'], [60, 'every minute'], [300, 'every 5 min']].map(([v, l]) => `<option value="${v}" ${+v === +(s.cycle ?? 10) ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}</div>
-    <div class="row small"><label class="grow" title="Above zero the camera flies forwards; steer with the joystick (Show joystick)">✈ Flight speed <input type="range" id="w-fly" min="0" max="1" step="0.01" aria-label="Flight speed"></label><output id="w-flyo"></output>
+    <div class="row small"><label class="grow" title="Above zero the camera flies forwards; steer with the joystick (Show joystick)">✈ Flight speed <input type="range" id="w-fly" min="0" max="1" step="0.001" aria-label="Flight speed"></label><output id="w-flyo"></output>
       <label title="The steering joystick, bottom left, while flying (off: a clear screen; the flight goes straight on)"><input type="checkbox" id="w-joy"> Show joystick</label></div>
     <div class="row small"><label class="grow">Wave size <input type="range" id="w-wave" min="0" max="1" step="0.01" aria-label="Wave size"></label><output id="w-waveo"></output>
       <label title="The sky's own sea"><input type="checkbox" id="w-waveauto"> auto</label></div>
@@ -3441,7 +3409,7 @@ window.Director = (api, opts = {}) => {
   showSea();
   // flight speed: 0 (stopped) … 1200 km/h, finer at the slow end
   const fly = $('w-fly'), toKmh = u => Math.round(1200 * u * u), fromKmh = v => Math.sqrt(v / 1200);
-  fly.value = fromKmh(+s.flySpeed || 0);
+  fly.value = fromKmh(flyDefault(s));
   const showFly = () => { const v = toKmh(+fly.value); $('w-flyo').textContent = v ? v + ' km/h' : 'off'; return v; };
   fly.oninput = () => D.configure({ flySpeed: showFly() });
   fly.onchange = () => persist({ flySpeed: showFly() });
@@ -3942,7 +3910,7 @@ window.Director = (api, opts = {}) => {
     const i = D.info, sc = window.__feed?.scene;
     lines.push(`sky       ${sc && !sc.live ? `${sc.mood} · ${sc.lookLabel}` : 'Live'} · ${i.weather} · sun ${f1(i.sunEl)}° · view ${f1(api.cam.pos.y)} km`);
     const oi = api.ocean?.info, os = api.ocean?.sea;
-    lines.push(api.params.oceanModel && oi ? `sea       ${i.sea || ''} · wind ${f1(os?.wind)} m/s · Hs ${f1(oi.hs)} m · peak λ ${Math.round(oi.peakWavelength || 0)} m · whitecaps ${((oi.whitecaps || 0) * 100).toFixed(1)}%` : `sea       analytic waves${api.ocean ? '' : ' (no float render targets)'}`);
+    lines.push(api.params.oceanModel && oi ? `sea       ${i.sea || ''} · wind ${f1(os?.wind)} m/s · Hs ${f1(oi.hs)} m · peak λ ${Math.round(oi.peakWavelength || 0)} m` : `sea       analytic waves${api.ocean ? '' : ' (no float render targets)'}`);
     return lines.join('\n');
   }
 
@@ -4006,6 +3974,7 @@ window.Director = (api, opts = {}) => {
     const bb = $('wp-bench'); bb.disabled = true;
     const keep = { cap: api.maxFps, sync: prof.sync, enabled: prof.enabled, scene: window.__feed?.scene };
     api.autoFrozen = true; api.maxFps = 0; prof.enabled = true;
+    const fly = D.flySpeed; D.configure({ flySpeed: 0 });   // fixed views: the same benchmark every time
     const rows = [];
     const out = $('wp-live');
     try {
@@ -4032,6 +4001,7 @@ window.Director = (api, opts = {}) => {
     } finally {
       prof.onSample = null; prof.sync = keep.sync; prof.enabled = keep.enabled || open;
       api.autoFrozen = false; api.maxFps = keep.cap;
+      D.configure({ flySpeed: fly });
       if (keep.scene) window.__feed.apply(keep.scene);
       benching = false; bb.disabled = false;
     }
@@ -4056,6 +4026,7 @@ window.Director = (api, opts = {}) => {
     const keep = { cap: api.maxFps, auto: p.autoQuality, autoPx: p.autoPx, res: p.resScale, px: api.pixelRatio, scene: window.__feed?.scene, sync: prof.sync };
     prof.sync = false;
     api.autoFrozen = true; api.maxFps = 0; api.set('autoQuality', 0); api.set('autoPx', 0);   // fixed resolutions, no cap
+    const fly = D.flySpeed; D.configure({ flySpeed: 0 });   // (fixed views)
     const holds = async () => {
       await wait(700);                                   // settle (new buffers, history)
       const f0 = api.frameCount; await wait(2000);
@@ -4088,6 +4059,7 @@ window.Director = (api, opts = {}) => {
       api.set('resScale', keep.res); api.setPixelRatio(keep.px);
       api.set('autoQuality', keep.auto); api.set('autoPx', keep.autoPx);
       api.maxFps = keep.cap; api.autoFrozen = false; prof.sync = keep.sync;
+      D.configure({ flySpeed: fly });
       if (keep.scene) window.__feed.apply(keep.scene);
       benching = false; btns.forEach(b => { b.disabled = false; });
     }
@@ -4217,7 +4189,7 @@ window.Director = (api, opts = {}) => {
       `clouds cov ${f(L.coverage)} dens ${f(L.density)} type ${f(L.type)} base ${f(L.base)} thick ${f(L.thick)} spacing ${f(L.spacing, 1)} shape ${f(L.shapeScale, 1)} detail ${f(L.detailScale)}`,
       `  erosion ${f(L.erosion)} wispy ${f(L.wispy)} anvil ${f(L.anvil)} wind ${f(L.windSpeed, 1)}m/s ${f(L.windDir, 0)}° evolve ${f(L.evolve)} · seed ${s.ws} · t ${f(s.ct, 1)}`,
       S ? `sea ${S.label} · wind ${f(S.wind, 1)} ${f(S.dir, 0)}° fetch ${f(S.fetch, 0)}km · swell ${f(S.swellH, 1)}m ${f(S.swellT, 1)}s ${f(S.swellDir, 0)}° · chop ${f(S.chop)} · size ${f(S.amp ?? 1)}× · t ${f(s.st, 1)}` : 'sea –',
-      S ? `  Hs ${f(oi?.hs, 1)}m · peak λ ${f(oi?.peakWavelength, 0)}m · whitecaps ${f((oi?.whitecaps || 0) * 100, 1)}% · water ${S.color.map(v => f(v, 4)).join(',')}` : '',
+      S ? `  Hs ${f(oi?.hs, 1)}m · peak λ ${f(oi?.peakWavelength, 0)}m · water ${S.color.map(v => f(v, 4)).join(',')}` : '',
       `cam alt ${f(s.cam[2] * 1000, 0)}m · yaw ${f(s.cam[0], 3)} · pitch ${f(s.cam[1], 3)} · fov ${f(s.cam[3], 1)}` +
         (s.cam[4] || s.cam[5] || s.cam[6] ? ` · at ${f(s.cam[4], 2)}, ${f(s.cam[5], 2)} km · roll ${f(s.cam[6], 3)}` : ''),
       s.fly ? `flying ${s.fly.kmh} km/h · path ${s.fly.path.length} points over ${f(s.fly.path.length ? s.fly.path.at(-1)[0] - s.fly.path[0][0] : 0, 1)} s (replay: &replay=1)` : '',
